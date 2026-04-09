@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caffè Suiso — Shopify Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F5EFE0; color: #2C2C2A; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 760px; margin: 0 auto; }
+
+  header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.75rem; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-dot { width: 36px; height: 36px; border-radius: 50%; background: #1B2A4A; display: flex; align-items: center; justify-content: center; }
+  .brand-dot span { color: #fff; font-weight: 700; font-size: 13px; letter-spacing: -.5px; }
+  h1 { font-size: 18px; font-weight: 600; color: #1B2A4A; line-height: 1.2; }
+  .subtitle { font-size: 12px; color: #888780; margin-top: 2px; }
+
+  .lang-group { display: flex; gap: 4px; }
+  .lang-btn { padding: 5px 14px; border: 1px solid #B4B2A9; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; background: transparent; color: #5F5E5A; transition: all .15s; }
+  .lang-btn.active { background: #1B2A4A; color: #fff; border-color: #1B2A4A; }
+  .lang-btn:hover:not(.active) { background: rgba(0,0,0,.05); }
+
+  .upload-zone { border: 1.5px dashed #B4B2A9; border-radius: 12px; padding: 3rem 2rem; text-align: center; cursor: pointer; transition: background .15s, border-color .15s; background: #fff; }
+  .upload-zone:hover, .upload-zone.drag { background: #E1F5EE; border-color: #1D9E75; }
+  .upload-icon { font-size: 2rem; margin-bottom: 10px; color: #1D9E75; }
+  .upload-title { font-size: 15px; font-weight: 500; color: #1B2A4A; margin-bottom: 4px; }
+  .upload-sub { font-size: 12px; color: #888780; }
+
+  #dashboard { display: none; }
+
+  .period { font-size: 12px; color: #888780; margin: 1.25rem 0 .75rem; padding: 8px 12px; background: rgba(27,42,74,.06); border-radius: 6px; display: flex; align-items: center; justify-content: space-between; }
+  .period strong { color: #1B2A4A; font-weight: 600; }
+  .reset-btn { font-size: 12px; color: #888780; cursor: pointer; text-decoration: underline; border: none; background: none; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  @media (max-width: 600px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+  .metric { background: #fff; border-radius: 10px; padding: 14px; border: 0.5px solid rgba(0,0,0,.07); }
+  .metric-label { font-size: 11px; color: #888780; margin-bottom: 4px; line-height: 1.3; }
+  .metric-value { font-size: 20px; font-weight: 600; color: #1B2A4A; }
+  .metric-sub { font-size: 11px; margin-top: 4px; }
+  .pos { color: #0F6E56; } .neg { color: #993C1D; }
+
+  .section-label { font-size: 11px; font-weight: 600; color: #888780; letter-spacing: .06em; text-transform: uppercase; margin: 1.5rem 0 .6rem; }
+
+  .month-header, .month-row { display: grid; grid-template-columns: 100px 1fr 110px 90px; gap: 8px; align-items: center; padding: 8px 0; font-size: 13px; }
+  .month-header { border-bottom: 1px solid #D3D1C7; padding-bottom: 6px; }
+  .month-row { border-bottom: 0.5px solid rgba(0,0,0,.07); }
+  .month-row:last-child { border-bottom: none; }
+  .col-right { text-align: right; }
+  .col-label { font-size: 11px; color: #888780; }
+  .month-name { color: #1B2A4A; font-weight: 500; }
+  .month-amount { text-align: right; font-weight: 500; color: #1B2A4A; }
+  .bar-bg { background: #E8E4D8; border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+
+  .bottom-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 1.25rem; }
+  .bottom-card { background: #fff; border-radius: 10px; padding: 14px; border: 0.5px solid rgba(0,0,0,.07); }
+  .bottom-card-label { font-size: 11px; color: #888780; margin-bottom: 6px; }
+  .bottom-card-value { font-size: 19px; font-weight: 600; color: #1B2A4A; margin-bottom: 4px; }
+  .bottom-card-sub { font-size: 11px; }
+  .bottom-card-detail { font-size: 11px; color: #888780; margin-top: 2px; }
+
+  .note { font-size: 11px; color: #B4B2A9; margin-top: 1rem; line-height: 1.5; }
+
+  footer { margin-top: 2.5rem; text-align: center; font-size: 11px; color: #B4B2A9; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="brand">
+      <div class="brand-dot"><span>CS</span></div>
+      <div>
+        <h1>Caffè Suiso</h1>
+        <p class="subtitle" id="subtitle">Glissez votre export CSV Shopify ci-dessous</p>
+      </div>
+    </div>
+    <div class="lang-group">
+      <button class="lang-btn active" onclick="setLang('fr')">FR</button>
+      <button class="lang-btn" onclick="setLang('it')">IT</button>
+    </div>
+  </header>
+
+  <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
+    <input type="file" id="csv-input" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+    <div class="upload-icon">↑</div>
+    <p class="upload-title" id="drop-title">Déposer le CSV Shopify ici</p>
+    <p class="upload-sub" id="drop-sub">ou cliquer pour choisir le fichier — export "Total sales over time" avec comparaison N-1</p>
+  </div>
+
+  <div id="dashboard">
+    <div class="period">
+      <span id="period-text"></span>
+      <button class="reset-btn" onclick="resetApp()" id="lbl-reset">Changer de fichier</button>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <p class="metric-label" id="lbl-net">Ventes nettes (cumul)</p>
+        <p class="metric-value" id="val-net">—</p>
+        <p class="metric-sub" id="val-net-vs">—</p>
+      </div>
+      <div class="metric">
+        <p class="metric-label" id="lbl-total">Ventes totales (cumul)</p>
+        <p class="metric-value" id="val-total">—</p>
+        <p class="metric-sub" id="val-total-vs">—</p>
+      </div>
+      <div class="metric">
+        <p class="metric-label" id="lbl-orders">Commandes</p>
+        <p class="metric-value" id="val-orders">—</p>
+        <p class="metric-sub" id="val-orders-vs">—</p>
+      </div>
+      <div class="metric">
+        <p class="metric-label" id="lbl-basket">Panier moyen (net)</p>
+        <p class="metric-value" id="val-basket">—</p>
+        <p class="metric-sub" id="val-basket-vs">—</p>
+      </div>
+    </div>
+
+    <p class="section-label" id="lbl-monthly">Ventes nettes par mois</p>
+
+    <div class="month-header">
+      <span class="col-label" id="lbl-col-month">Mois</span>
+      <span class="col-label">Volume</span>
+      <span class="col-label col-right" id="lbl-col-net">Ventes nettes</span>
+      <span class="col-label col-right">vs N-1</span>
+    </div>
+    <div id="month-rows"></div>
+
+    <div class="bottom-cards">
+      <div class="bottom-card">
+        <p class="bottom-card-label" id="lbl-q1">Q1 — Ventes nettes</p>
+        <p class="bottom-card-value" id="val-q1">—</p>
+        <p class="bottom-card-sub" id="val-q1-vs">—</p>
+        <p class="bottom-card-detail" id="val-q1-orders">—</p>
+      </div>
+      <div class="bottom-card">
+        <p class="bottom-card-label" id="lbl-discount">Taux de remise moyen</p>
+        <p class="bottom-card-value" id="val-discount">—</p>
+        <p class="bottom-card-sub" id="val-discount-vs">—</p>
+        <p class="bottom-card-detail" id="val-discount-detail">—</p>
+      </div>
+    </div>
+
+    <p class="note" id="footer-note">* Mois partiel · Ventes nettes = après remises et retours, hors livraison et taxes</p>
+  </div>
+
+  <footer>Caffè Suiso · <span id="footer-year"></span></footer>
+</div>
+
+<script>
+document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+const T = {
+  fr: {
+    subtitle: 'Glissez votre export CSV Shopify ci-dessous',
+    dropTitle: 'Déposer le CSV Shopify ici',
+    dropSub: 'ou cliquer pour choisir le fichier — export "Total sales over time" avec comparaison N-1',
+    lblNet: 'Ventes nettes (cumul)', lblTotal: 'Ventes totales (cumul)',
+    lblOrders: 'Commandes', lblBasket: 'Panier moyen (net)',
+    lblMonthly: 'Ventes nettes par mois',
+    lblMonth: 'Mois', lblNetCol: 'Ventes nettes',
+    lblReset: 'Changer de fichier',
+    lblQ1: 'Q1 — Ventes nettes', lblDiscount: 'Taux de remise moyen',
+    note: '* Mois partiel · Ventes nettes = après remises et retours, hors livraison et taxes',
+    months: ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'],
+    vs: 'vs', betterThan: 'Mieux qu\'en', orders: 'commandes',
+    gross: 'Brut', net: 'Net'
+  },
+  it: {
+    subtitle: 'Trascina qui il tuo export CSV Shopify',
+    dropTitle: 'Trascina il CSV Shopify qui',
+    dropSub: 'oppure clicca per scegliere il file — export "Total sales over time" con confronto anno precedente',
+    lblNet: 'Vendite nette (da inizio anno)', lblTotal: 'Vendite totali (da inizio anno)',
+    lblOrders: 'Ordini', lblBasket: 'Valore medio ordine',
+    lblMonthly: 'Vendite nette per mese',
+    lblMonth: 'Mese', lblNetCol: 'Vendite nette',
+    lblReset: 'Cambia file',
+    lblQ1: 'Q1 — Vendite nette', lblDiscount: 'Tasso di sconto medio',
+    note: '* Mese parziale · Vendite nette = dopo sconti e resi, escluse spedizione e tasse',
+    months: ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'],
+    vs: 'rispetto al', betterThan: 'Migliore del', orders: 'ordini',
+    gross: 'Lordo', net: 'Netto'
+  }
+};
+
+let lang = 'fr';
+let parsedData = null;
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.textContent === l.toUpperCase()));
+  applyTranslations();
+  if (parsedData) renderDashboard(parsedData);
+}
+
+function applyTranslations() {
+  const t = T[lang];
+  const ids = {
+    subtitle: t.subtitle, 'drop-title': t.dropTitle, 'drop-sub': t.dropSub,
+    'lbl-net': t.lblNet, 'lbl-total': t.lblTotal, 'lbl-orders': t.lblOrders,
+    'lbl-basket': t.lblBasket, 'lbl-monthly': t.lblMonthly,
+    'lbl-col-month': t.lblMonth, 'lbl-col-net': t.lblNetCol,
+    'lbl-reset': t.lblReset, 'lbl-q1': t.lblQ1, 'lbl-discount': t.lblDiscount,
+    'footer-note': t.note
+  };
+  Object.entries(ids).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  });
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const vals = [];
+    let cur = '', inQ = false;
+    for (const ch of line + ',') {
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (ch === ',' && !inQ) { vals.push(cur.trim()); cur = ''; continue; }
+      cur += ch;
+    }
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] || '');
+    return obj;
+  });
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    parsedData = parseCSV(e.target.result);
+    renderDashboard(parsedData);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function fmt(n) {
+  return 'CHF ' + Math.round(n).toLocaleString('fr-CH');
+}
+function pct(n) {
+  return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+}
+
+function renderDashboard(rows) {
+  const t = T[lang];
+  let totNet = 0, totSales = 0, totOrders = 0;
+  let totNetPY = 0, totSalesPY = 0, totOrdersPY = 0;
+  let totGross = 0, totGrossPY = 0;
+  let q1Net = 0, q1NetPY = 0, q1Orders = 0, q1OrdersPY = 0;
+  const months = [];
+  let maxNet = 0;
+  let firstMonth = '', lastMonth = '';
+
+  rows.forEach((r, i) => {
+    const net = parseFloat(r['Net sales']) || 0;
+    const sales = parseFloat(r['Total sales']) || 0;
+    const orders = parseInt(r['Orders']) || 0;
+    const gross = parseFloat(r['Gross sales']) || 0;
+    const netPY = parseFloat(r['Net sales (previous_year)']) || 0;
+    const salesPY = parseFloat(r['Total sales (previous_year)']) || 0;
+    const ordersPY = parseInt(r['Orders (previous_year)']) || 0;
+    const grossPY = parseFloat(r['Gross sales (previous_year)']) || 0;
+
+    totNet += net; totSales += sales; totOrders += orders; totGross += gross;
+    totNetPY += netPY; totSalesPY += salesPY; totOrdersPY += ordersPY; totGrossPY += grossPY;
+
+    const dateStr = r['Month'] || r[Object.keys(r)[0]];
+    const d = new Date(dateStr);
+    const mi = isNaN(d) ? i : d.getMonth();
+    const yr = isNaN(d) ? new Date().getFullYear() : d.getFullYear();
+    if (i === 0) firstMonth = t.months[mi];
+    lastMonth = t.months[mi];
+
+    if (mi < 3) {
+      q1Net += net; q1NetPY += netPY;
+      q1Orders += orders; q1OrdersPY += ordersPY;
+    }
+
+    if (net > maxNet) maxNet = net;
+    months.push({ label: t.months[mi], net, netPY, orders, partial: orders < 25 && i === rows.length - 1 });
+  });
+
+  const yr = new Date().getFullYear();
+  const yrPY = yr - 1;
+
+  document.getElementById('period-text').innerHTML =
+    `<strong>${firstMonth} – ${lastMonth} ${yr}</strong> ${t.vs} ${yrPY}`;
+
+  const set = (id, val, cls) => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = val; if (cls) el.className = 'metric-sub ' + cls; }
+  };
+
+  set('val-net', fmt(totNet));
+  set('val-net-vs', (totNetPY ? ((totNet-totNetPY)/totNetPY*100 >= 0 ? '↑ ' : '↓ ') + pct((totNet-totNetPY)/totNetPY*100) + ' ' + t.vs + ' ' + yrPY : '—'), totNetPY && totNet >= totNetPY ? 'pos' : 'neg');
+
+  set('val-total', fmt(totSales));
+  set('val-total-vs', (totSalesPY ? ((totSales-totSalesPY)/totSalesPY*100 >= 0 ? '↑ ' : '↓ ') + pct((totSales-totSalesPY)/totSalesPY*100) + ' ' + t.vs + ' ' + yrPY : '—'), totSalesPY && totSales >= totSalesPY ? 'pos' : 'neg');
+
+  set('val-orders', totOrders);
+  set('val-orders-vs', (totOrdersPY ? ((totOrders-totOrdersPY)/totOrdersPY*100 >= 0 ? '↑ ' : '↓ ') + pct((totOrders-totOrdersPY)/totOrdersPY*100) + ' ' + t.vs + ' ' + yrPY : '—'), totOrdersPY && totOrders >= totOrdersPY ? 'pos' : 'neg');
+
+  const basket = totOrders ? totNet / totOrders : 0;
+  const basketPY = totOrdersPY ? totNetPY / totOrdersPY : 0;
+  const vsBasket = basketPY ? (basket - basketPY) / basketPY * 100 : 0;
+  set('val-basket', 'CHF ' + basket.toFixed(1));
+  set('val-basket-vs', basketPY ? (vsBasket >= 0 ? '↑ ' : '↓ ') + pct(vsBasket) + ' ' + t.vs + ' ' + yrPY : '—', vsBasket >= 0 ? 'pos' : 'neg');
+
+  const container = document.getElementById('month-rows');
+  container.innerHTML = '';
+  months.forEach(m => {
+    const vsM = m.netPY ? (m.net - m.netPY) / m.netPY * 100 : 0;
+    const barW = maxNet ? Math.round(m.net / maxNet * 100) : 0;
+    const barColor = m.partial ? '#85B7EB' : '#1D9E75';
+    const vsColor = vsM >= 0 ? '#0F6E56' : '#993C1D';
+    container.innerHTML += `<div class="month-row">
+      <span class="month-name">${m.label}${m.partial ? ' *' : ''}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${barW}%;background:${barColor};"></div></div>
+      <span class="month-amount">${fmt(m.net)}</span>
+      <span style="text-align:right;color:${vsColor};font-size:12px;">${m.netPY ? pct(vsM) : '—'}</span>
+    </div>`;
+  });
+
+  const q1vsNet = q1NetPY ? (q1Net - q1NetPY) / q1NetPY * 100 : 0;
+  set('val-q1', fmt(q1Net));
+  const q1vsEl = document.getElementById('val-q1-vs');
+  if (q1vsEl) { q1vsEl.textContent = q1NetPY ? (q1vsNet >= 0 ? '↑ ' : '↓ ') + pct(q1vsNet) + ' ' + t.vs + ' Q1 ' + yrPY + ' (' + fmt(q1NetPY) + ')' : '—'; q1vsEl.className = 'bottom-card-sub ' + (q1vsNet >= 0 ? 'pos' : 'neg'); }
+  const q1ordEl = document.getElementById('val-q1-orders');
+  if (q1ordEl) q1ordEl.textContent = q1OrdersPY ? q1OrdersPY + ' → ' + q1Orders + ' ' + t.orders + ' (' + pct((q1Orders - q1OrdersPY) / q1OrdersPY * 100) + ')' : q1Orders + ' ' + t.orders;
+
+  const discountRate = totGross ? (totGross - totNet) / totGross * 100 : 0;
+  const discountRatePY = totGrossPY ? (totGrossPY - totNetPY) / totGrossPY * 100 : 0;
+  set('val-discount', '−' + discountRate.toFixed(1) + '%');
+  const discVsEl = document.getElementById('val-discount-vs');
+  if (discVsEl) { discVsEl.textContent = discountRatePY ? (discountRate < discountRatePY ? t.betterThan + ' ' + yrPY + ' (−' + discountRatePY.toFixed(1) + '%)' : '−' + discountRatePY.toFixed(1) + '% en ' + yrPY) : '—'; discVsEl.className = 'bottom-card-sub ' + (discountRate <= discountRatePY ? 'pos' : 'neg'); }
+  const discDetailEl = document.getElementById('val-discount-detail');
+  if (discDetailEl) discDetailEl.textContent = totGross ? t.gross + ': ' + fmt(totGross) + ' → ' + t.net + ': ' + fmt(totNet) : '—';
+
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('drop-zone').style.display = 'none';
+}
+
+function resetApp() {
+  parsedData = null;
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('csv-input').value = '';
+}
+
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+</script>
+</body>
+</html>

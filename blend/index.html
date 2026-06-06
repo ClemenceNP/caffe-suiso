@@ -293,6 +293,10 @@
     font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
     color: var(--muted);
   }
+  .result-ref {
+    font-size: 11px; letter-spacing: 1px;
+    color: var(--muted); margin-bottom: 0.5rem;
+  }
 
   .result-card {
     background: white;
@@ -370,6 +374,10 @@
     transition: border-color 0.2s;
   }
   .gift-row:hover { border-color: var(--crema); }
+  .gift-row.gift-on {
+    border-style: solid; border-color: var(--crema);
+    background: var(--milk);
+  }
   .gift-icon-wrap {
     width: 32px; height: 32px; border-radius: 50%;
     background: var(--fog); display: flex;
@@ -498,6 +506,7 @@
     <div class="result-top">
       <div class="result-eyebrow" id="r-eyebrow">Una miscela personale di</div>
       <div class="result-name" id="r-name">—</div>
+      <div class="result-ref" id="r-ref"></div>
       <div class="result-tag" id="r-tag">Tostato su ordinazione · Caffè Suiso</div>
     </div>
 
@@ -523,7 +532,7 @@
       </div>
     </div>
 
-    <div class="gift-row">
+    <div class="gift-row" id="gift-row" onclick="toggleGift()">
       <div class="gift-icon-wrap">◇</div>
       <div>
         <div class="gift-text" id="r-gift">Offri questo blend in regalo</div>
@@ -532,8 +541,8 @@
     </div>
 
     <div class="cta-row">
-      <button class="btn-order" id="r-order">Aggiungi al carrello</button>
-      <button class="btn-share" id="r-share">Condividi</button>
+      <button class="btn-order" id="r-order" onclick="orderBlend()">Aggiungi al carrello</button>
+      <button class="btn-share" id="r-share" onclick="shareBlend()">Condividi</button>
     </div>
     <div class="restart" id="r-restart" onclick="restart()">Ricominciare</div>
   </div>
@@ -1052,12 +1061,137 @@ function getRoastIdx(ans) {
 }
 
 // ══════════════════════════════════════════
+// SHOPIFY CONFIG
+// Product "Miscela Personalizzata" — 12 variants (grind × weight)
+// ══════════════════════════════════════════
+const SHOP_URL = 'https://www.caffesuiso.ch';
+// Registre des blends (Google Sheet via Apps Script) — colle ici l'URL du web app (…/exec).
+// Tant que c'est vide, l'enregistrement est simplement ignoré.
+const REGISTRY_URL = 'https://script.google.com/macros/s/AKfycbwX_xG2GZT6EXdC46CXc4s-qVSWC2g6hklA4zBYTODmGdkEDmXaMWKXo7Afl6ikFXQj/exec';
+const VARIANTS = {
+  grani:    { '250g': '54876924805498', '500g': '54876924838266', '1kg': '54876924871034' },
+  moka:     { '250g': '54876924903802', '500g': '54876924936570', '1kg': '54876924969338' },
+  filtro:   { '250g': '54876925002106', '500g': '54876925034874', '1kg': '54876925067642' },
+  espresso: { '250g': '54876925100410', '500g': '54876925133178', '1kg': '54876925165946' }
+};
+// Canonical names used in the order properties (always IT for the roaster)
+const ORIGIN_IT = { br: 'Brasile Arabica', co: 'Colombia Arabica', ind: 'India Arabica', inr: 'India Robusta', dec: 'Brasile Decaf' };
+const ROAST_IT = ['Chiara', 'Medio-chiara', 'Media', 'Medio-scura', 'Scura'];
+const COPIED = { it: 'Copiato!', en: 'Copied!', fr: 'Copié !', de: 'Kopiert!' };
+
+// Short unique reference (no confusable chars), e.g. "A7K2" — disambiguates same-named blends
+function makeBlendId() {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 4; i++) s += A[Math.floor(Math.random() * A.length)];
+  return s;
+}
+
+// Map quiz method (Q1) → Shopify grind variant key
+function methodToGrind(method) {
+  if (method === 'espresso') return 'espresso';
+  if (method === 'moka') return 'moka';
+  if (method === 'auto') return 'grani';      // bean-to-cup grinds itself → whole beans
+  return 'filtro';                             // filter / french / cold
+}
+
+// Build "Brasile Arabica 35% · Colombia 25% · …" sorted desc, non-zero only
+function compositionString(blend) {
+  return [['br', ORIGIN_IT.br], ['co', ORIGIN_IT.co], ['ind', ORIGIN_IT.ind], ['inr', ORIGIN_IT.inr], ['dec', ORIGIN_IT.dec]]
+    .filter(([k]) => blend[k] > 0)
+    .sort((a, b) => blend[b[0]] - blend[a[0]])
+    .map(([k, name]) => `${name} ${blend[k]}%`)
+    .join(' · ');
+}
+
+// Line-item properties attached to the order.
+// Keys starting with "_" are hidden from the customer (cart/checkout/emails)
+// but stay visible to you on the order in the Shopify admin.
+// Line-item properties attached to the order.
+// Only what the customer (and you, on the order) should see.
+function blendProps() {
+  const props = {
+    'Nome miscela': `${lastName} · #${lastBlendId}`,
+    'Composizione': compositionString(lastBlend)
+  };
+  if (isGift) props['Regalo'] = 'Sì';
+  return props;
+}
+
+// Enregistre le blend dans le registre (best-effort, n'empêche jamais la commande)
+function logBlend() {
+  if (!REGISTRY_URL) return;
+  const payload = {
+    name: lastName,
+    id: lastBlendId,
+    composition: compositionString(lastBlend),
+    weight: weight,
+    grind: methodToGrind(lastMethod),
+    gift: isGift ? 'Sì' : '',
+    br: lastBlend.br, co: lastBlend.co, ind: lastBlend.ind, inr: lastBlend.inr, dec: lastBlend.dec
+  };
+  try {
+    fetch(REGISTRY_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) { /* on ignore : le log ne doit jamais bloquer la commande */ }
+}
+
+// Add to cart via a POST form to /cart/add — this endpoint accepts
+// line-item properties (the GET cart permalink does NOT).
+function orderBlend() {
+  logBlend();
+  const variantId = VARIANTS[methodToGrind(lastMethod)][weight];
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = `${SHOP_URL}/cart/add`;
+  form.target = '_blank';
+  const add = (name, value) => {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = name; i.value = value;
+    form.appendChild(i);
+  };
+  add('id', variantId);
+  add('quantity', '1');
+  Object.entries(blendProps()).forEach(([k, v]) => add(`properties[${k}]`, v));
+  add('return_to', '/cart');
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+}
+
+async function shareBlend() {
+  const text = `${lastName} — ${compositionString(lastBlend)} · Caffè Suiso`;
+  const url = location.href.split('#')[0];
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: lastName, text, url });
+    } else {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+      const btn = document.getElementById('r-share');
+      const prev = btn.textContent;
+      btn.textContent = COPIED[lang] || 'Copied!';
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    }
+  } catch (e) { /* user cancelled share */ }
+}
+
+function toggleGift() {
+  isGift = !isGift;
+  document.getElementById('gift-row').classList.toggle('gift-on', isGift);
+}
+
+// ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
 let lang = 'it';
 let step = 0;
 let answers = new Array(6).fill(null);
 let weight = '500g';
+let lastBlend = null, lastName = '', lastRoastIdx = 2, lastMethod = 'espresso', isGift = false, lastBlendId = '';
 
 function setLang(l) {
   lang = l;
@@ -1065,7 +1199,7 @@ function setLang(l) {
     b.classList.toggle('active', ['it','en','fr','de'][i] === l);
   });
   const t = LANGS[l];
-  document.getElementById('intro-sub').textContent = t.introSub.replace('\\n','\n');
+  document.getElementById('intro-sub').innerHTML = t.introSub.replace(/\n/g, '<br>');
   document.getElementById('intro-btn').textContent = t.introBtn;
 }
 
@@ -1121,7 +1255,7 @@ function pickAnswer(i) {
 
 function renderNaming() {
   const t = LANGS[lang];
-  document.getElementById('name-title').textContent = t.nameTitle.replace('\\n', '\n');
+  document.getElementById('name-title').innerHTML = t.nameTitle.replace(/\n/g, '<br>');
   document.getElementById('name-sub').textContent = t.nameSub;
   document.getElementById('name-input').placeholder = t.namePlaceholder;
   document.getElementById('weight-lbl').textContent = t.weightLabel;
@@ -1156,9 +1290,16 @@ function buildResult() {
   const flavours = getFlavours(ans, blend, lang);
   const roastIdx = getRoastIdx(ans);
 
+  // Persist for the order / share / gift handlers
+  lastBlend = blend; lastName = name; lastRoastIdx = roastIdx; lastMethod = ans[0];
+  lastBlendId = makeBlendId();
+  isGift = false;
+  document.getElementById('gift-row').classList.remove('gift-on');
+
   // Populate UI
   document.getElementById('r-eyebrow').textContent = t.rEyebrow;
   document.getElementById('r-name').textContent = name;
+  document.getElementById('r-ref').textContent = '#' + lastBlendId;
   document.getElementById('r-tag').textContent = t.rTag;
   document.getElementById('r-comp-label').textContent = t.rComp;
   document.getElementById('r-profile-label').textContent = t.rProfile;
@@ -1211,7 +1352,8 @@ function buildResult() {
 }
 
 function restart() {
-  step = 0; answers = new Array(6).fill(null); weight = '500g';
+  step = 0; answers = new Array(6).fill(null); weight = '500g'; isGift = false;
+  document.getElementById('gift-row').classList.remove('gift-on');
   document.querySelectorAll('.w-btn').forEach((b, i) => b.classList.toggle('sel', i === 1));
   goScreen('intro');
 }

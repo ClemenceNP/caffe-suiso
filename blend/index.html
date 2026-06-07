@@ -1130,14 +1130,16 @@ function logBlend() {
     gift: isGift ? 'Sì' : '',
     br: lastBlend.br, co: lastBlend.co, ind: lastBlend.ind, inr: lastBlend.inr, dec: lastBlend.dec
   };
+  const body = JSON.stringify(payload);
   try {
-    fetch(REGISTRY_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-  } catch (e) { /* on ignore : le log ne doit jamais bloquer la commande */ }
+    // sendBeacon est conçu pour partir même quand la page se ferme/navigue
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(REGISTRY_URL, new Blob([body], { type: 'text/plain;charset=UTF-8' }));
+    } else {
+      fetch(REGISTRY_URL, { method: 'POST', mode: 'no-cors', keepalive: true,
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: body });
+    }
+  } catch (e) { /* le log ne doit jamais bloquer la commande */ }
 }
 
 // Add to cart via a POST form to /cart/add — this endpoint accepts
@@ -1148,7 +1150,7 @@ function orderBlend() {
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = `${SHOP_URL}/cart/add`;
-  form.target = '_blank';
+  // Même onglet : navigation de premier plan, jamais bloquée comme un popup
   const add = (name, value) => {
     const i = document.createElement('input');
     i.type = 'hidden'; i.name = name; i.value = value;
@@ -1160,7 +1162,6 @@ function orderBlend() {
   add('return_to', '/cart');
   document.body.appendChild(form);
   form.submit();
-  form.remove();
 }
 
 async function shareBlend() {

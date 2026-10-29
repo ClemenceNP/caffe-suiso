@@ -216,7 +216,7 @@ tr.row-alerte td{background:var(--relancer-bg)}
         <pre id="q1">FROM payments
   SHOW net_payments
   GROUP BY order_name, customer_name, customer_email,
-    payment_gateway, order_tags, day
+    payment_gateway, order_tag, day
   SINCE 2025-01-01 UNTIL today
   ORDER BY day ASC
   LIMIT 10000</pre>
@@ -226,7 +226,7 @@ tr.row-alerte td{background:var(--relancer-bg)}
         <pre id="q2">FROM sales
   SHOW total_sales
   GROUP BY order_name, customer_name, customer_email,
-    order_payment_status, order_tags, day
+    order_payment_status, order_tag, day
   SINCE 2025-01-01 UNTIL today
   ORDER BY day ASC
   LIMIT 10000</pre>
@@ -1010,7 +1010,7 @@ function readShopifyCsv(rows){
   if (!kOrder) throw new Error('order_name');
   const kCust = pickKey(keys, 'customer_name', 'Customer name', 'Billing Name');
   const kEmail = pickKey(keys, 'customer_email', 'Customer email', 'Email');
-  const kTags = pickKey(keys, 'order_tags', 'Order tags', 'Tags');
+  const kTags = pickKey(keys, 'order_tag', 'Order tag', 'order_tags', 'Order tags', 'Tags', 'Tag');
   const kDay = pickKey(keys, 'day', 'Day', 'Date', 'Created at', 'month', 'Month');
   const kAmt = pickKey(keys, 'net_payments', 'Net payments', 'gross_payments', 'Gross payments', 'total_sales', 'Total sales', 'Total');
   const out = [];
@@ -1026,8 +1026,21 @@ function readShopifyCsv(rows){
   return { kind: kGw ? 'paiements' : (kStatus ? 'commandes' : null), rows: out };
 }
 
+// Le rapport groupé par « order_tag » répète une même ligne une fois par tag : on fusionne les doublons
+function mergeTagRows(rows){
+  const m = new Map();
+  for (const r of rows){
+    const k = [r.name, r.gateway, r.status, r.date, r.amount].join('|');
+    const x = m.get(k);
+    if (x){ for (const t of r.tags) if (!x.tags.includes(t)) x.tags.push(t); }
+    else m.set(k, { ...r, tags: r.tags.slice() });
+  }
+  return [...m.values()];
+}
+
 function reconcileV2({ payRows, orderRows, ubs, config }){
   config = config || {};
+  payRows = mergeTagRows(payRows); orderRows = mergeTagRows(orderRows);
   const delai = config.delaiRelance || 30;
   const tagsOff = (config.tagsHorsUbs && config.tagsHorsUbs.length ? config.tagsHorsUbs : DEFAULT_TAGS).map(t => deaccent(t.toLowerCase()));
   const idx = new NameIndex(config.alias || []);

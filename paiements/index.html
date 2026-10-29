@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Contrôle paiements</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ---- couleurs & typo : à ajuster librement ---- */
+:root{
+  --bg:#F4EEE6; --surface:#FFFFFF; --surface-2:#FAF6F0; --line:#E4D9CB;
+  --ink:#1F2A44; --muted:#6B6F7B; --accent:#A42516; --accent-ink:#FFFFFF;
+  --relancer:#A42516; --relancer-bg:#F8E4E0;
+  --verifier:#9A5B00; --verifier-bg:#FBEBD2;
+  --fermer:#1F6B45;  --fermer-bg:#DDF0E4;
+  --ok:#4D6B5A;      --ok-bg:#E8EFEA;
+  --info:#5E6472;    --info-bg:#ECECEF;
+  --attente:#2D5C8A; --attente-bg:#E1EBF5;
+  --radius:12px; --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15181F; --surface:#1D212B; --surface-2:#222734; --line:#323849;
+    --ink:#ECE6DD; --muted:#A3A7B3; --accent:#E0644F; --accent-ink:#15181F;
+    --relancer:#F08E7D; --relancer-bg:#3A221F; --verifier:#F0B35A; --verifier-bg:#3A2D17;
+    --fermer:#7FD1A1; --fermer-bg:#1B3427; --ok:#A6C4B1; --ok-bg:#223029;
+    --info:#B5B9C4; --info-bg:#2A2F3B; --attente:#8DB8E6; --attente-bg:#1E2C3D;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15181F; --surface:#1D212B; --surface-2:#222734; --line:#323849;
+  --ink:#ECE6DD; --muted:#A3A7B3; --accent:#E0644F; --accent-ink:#15181F;
+  --relancer:#F08E7D; --relancer-bg:#3A221F; --verifier:#F0B35A; --verifier-bg:#3A2D17;
+  --fermer:#7FD1A1; --fermer-bg:#1B3427; --ok:#A6C4B1; --ok-bg:#223029;
+  --info:#B5B9C4; --info-bg:#2A2F3B; --attente:#8DB8E6; --attente-bg:#1E2C3D;
+}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+a{color:var(--accent)}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+.top{padding:28px 0 18px}
+.top .wrap{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
+h1{font-size:28px;margin-top:4px}
+.privacy{margin:0;color:var(--muted);font-size:13px;max-width:360px}
+
+.files{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.drop{background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--surface-2)}
+.drop.loaded{border-style:solid}
+.drop-head{display:flex;gap:12px;align-items:flex-start}
+.drop h2{font-size:16px}
+.drop p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.step{flex:none;width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;font-size:13px;font-weight:600}
+.drop.loaded .step{background:var(--fermer)}
+.status{font-size:13px;color:var(--muted);min-height:20px}
+.status .okline{color:var(--fermer)}
+.status .warn{color:var(--verifier)}
+.status .err{color:var(--relancer)}
+
+.btn{font:inherit;font-size:14px;font-weight:600;border-radius:999px;padding:9px 16px;border:1.5px solid transparent;cursor:pointer;display:inline-flex;align-items:center;gap:6px;width:max-content}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.small{font-size:13px;padding:6px 12px}
+.actions{display:flex;align-items:center;gap:12px;margin:16px 0 28px;flex-wrap:wrap}
+.hint{color:var(--muted);font-size:13px}
+
+.asof{color:var(--muted);font-size:13px;margin-bottom:10px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+.kpi{background:var(--surface);border-radius:var(--radius);padding:14px 16px;border:1px solid var(--line);cursor:pointer;text-align:left;font:inherit;color:inherit}
+.kpi:hover{border-color:var(--ink)}
+.kpi .n{font-size:26px;font-weight:700;line-height:1.1}
+.kpi .l{font-size:13px;color:var(--muted);margin-top:2px}
+.kpi .s{font-size:13px;font-weight:600;margin-top:6px}
+.kpi.relancer .n{color:var(--relancer)} .kpi.verifier .n{color:var(--verifier)} .kpi.fermer .n{color:var(--fermer)}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tab{font:inherit;font-size:14px;background:none;border:0;padding:10px 12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.tab .c{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:999px;background:var(--surface-2);font-size:12px;text-align:center}
+.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:14px 0 6px;flex-wrap:wrap}
+.toolbar input[type=search]{font:inherit;font-size:14px;padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);min-width:280px}
+.toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.tabnote{color:var(--muted);font-size:13px;margin:4px 0 10px}
+
+.tablewrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto;margin-bottom:48px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{padding:9px 12px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:var(--surface-2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+td.nowrap{white-space:nowrap}
+td .sub{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.relancer{color:var(--relancer);background:var(--relancer-bg)}
+.pill.verifier{color:var(--verifier);background:var(--verifier-bg)}
+.pill.fermer{color:var(--fermer);background:var(--fermer-bg)}
+.pill.ok{color:var(--ok);background:var(--ok-bg)}
+.pill.info{color:var(--info);background:var(--info-bg)}
+.pill.attente{color:var(--attente);background:var(--attente-bg)}
+.flag{display:inline-block;font-size:12px;color:var(--verifier);margin-top:3px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+details summary{cursor:pointer;color:var(--accent);font-size:13px}
+details ul{margin:6px 0 0;padding-left:18px}
+.linkbtn{font:inherit;font-size:12.5px;background:none;border:0;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+.assoc{display:flex;gap:6px;margin-top:6px}
+.assoc input{font:inherit;font-size:13px;padding:4px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:200px}
+
+dialog{border:0;border-radius:16px;padding:0;max-width:640px;width:calc(100% - 32px);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(20,22,30,.45)}
+.settings{padding:22px;display:flex;flex-direction:column;gap:8px}
+.settings h2{font-size:20px}
+.settings h3{font-size:15px;margin-top:14px}
+.muted{color:var(--muted);font-size:13px;margin:0}
+.kv{display:flex;flex-direction:column;gap:4px;max-height:200px;overflow:auto}
+.kv .item{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface-2);border-radius:8px;padding:6px 10px;font-size:13.5px}
+.kv-add{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.kv-add input,.inline input{font:inherit;font-size:13.5px;padding:7px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);flex:1;min-width:150px}
+.inline{display:flex;align-items:center;gap:8px;font-size:14px}
+.inline input{flex:none;width:80px}
+.settings-foot{display:flex;gap:8px;align-items:center;margin-top:18px;flex-wrap:wrap}
+.spacer{flex:1}
+.x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+
+@media (max-width:900px){
+  .files{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .toolbar input[type=search]{min-width:0;width:100%}
+}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="eyebrow">Caffè Suiso · interne</span>
+      <h1>Contrôle des paiements</h1>
+    </div>
+    <p class="privacy">Tes fichiers sont lus dans ce navigateur. Rien n'est envoyé ni enregistré en ligne.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="files" aria-label="Fichiers">
+    <div class="drop" data-kind="tracker">
+      <div class="drop-head"><span class="step">1</span><div><h2>Tracker factures</h2><p>Google Sheets → Fichier → Télécharger → <b>.xlsx</b></p></div></div>
+      <label class="btn ghost">Choisir le fichier<input type="file" accept=".xlsx,.xls,.csv" multiple hidden></label>
+      <div class="status" data-status="tracker">Aucun fichier</div>
+    </div>
+    <div class="drop" data-kind="ubs">
+      <div class="drop-head"><span class="step">2</span><div><h2>Relevés UBS</h2><p>PDF « Movimenti di conto », un ou plusieurs</p></div></div>
+      <label class="btn ghost">Choisir les PDF<input type="file" accept=".pdf" multiple hidden></label>
+      <div class="status" data-status="ubs">Aucun fichier</div>
+    </div>
+    <div class="drop" data-kind="shopify">
+      <div class="drop-head"><span class="step">3</span><div><h2>Export Shopify</h2><p>Rapport « Contrôle paiements » → Export <b>.csv</b></p></div></div>
+      <label class="btn ghost">Choisir le CSV<input type="file" accept=".csv" hidden></label>
+      <div class="status" data-status="shopify">Aucun fichier</div>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button class="btn primary" id="run" disabled>Lancer le contrôle</button>
+    <button class="btn ghost" id="openSettings">Paramètres</button>
+    <span class="hint" id="runHint">Charge au moins le tracker et les relevés UBS. Shopify est recommandé.</span>
+  </div>
+
+  <section id="results" hidden>
+    <div class="asof" id="asof"></div>
+    <div class="kpis" id="kpis"></div>
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <div class="toolbar">
+      <input type="search" id="filter" placeholder="Filtrer (client, n° de facture, montant…)">
+      <div class="toolbar-actions">
+        <button class="btn ghost small" id="copySel" hidden>Copier la sélection pour les relances</button>
+        <button class="btn ghost small" id="exportTab">Exporter cet onglet (.csv)</button>
+        <button class="btn ghost small" id="exportAll">Tout exporter (.csv)</button>
+      </div>
+    </div>
+    <p class="tabnote" id="tabnote"></p>
+    <div class="tablewrap" id="table"></div>
+  </section>
+</main>
+
+<dialog id="settings">
+  <form method="dialog" class="settings">
+    <h2>Paramètres</h2>
+    <p class="muted">Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.</p>
+
+    <h3>Alias (même client, noms différents)</h3>
+    <p class="muted">Ex. « Malcanton » dans le tracker = « Green Web Solutions » sur UBS.</p>
+    <div id="aliasList" class="kv"></div>
+    <div class="kv-add">
+      <input id="aliasDe" placeholder="Nom dans le tracker / Shopify" list="knownNames">
+      <span>=</span>
+      <input id="aliasVers" placeholder="Nom sur le relevé UBS" list="knownNames">
+      <button type="button" class="btn ghost small" id="aliasAdd">Ajouter</button>
+    </div>
+
+    <h3>Virements à ignorer</h3>
+    <p class="muted">Virements internes, remboursements, apports… (le titulaire du compte est ignoré automatiquement).</p>
+    <div id="ignoreList" class="kv"></div>
+    <div class="kv-add">
+      <input id="ignoreName" placeholder="Nom de l'émetteur sur UBS" list="knownNames">
+      <button type="button" class="btn ghost small" id="ignoreAdd">Ajouter</button>
+    </div>
+
+    <h3>Délai avant relance</h3>
+    <label class="inline"><input type="number" id="delai" min="0" max="365" step="1"> jours après la date de la facture</label>
+
+    <div class="settings-foot">
+      <label class="btn ghost small">Importer (.json)<input type="file" id="importCfg" accept=".json" hidden></label>
+      <button type="button" class="btn ghost small" id="exportCfg">Exporter (.json)</button>
+      <span class="spacer"></span>
+      <button class="btn primary" value="close">Fermer</button>
+    </div>
+  </form>
+</dialog>
+<datalist id="knownNames"></datalist>
+
+<script>
+// ---------- CSV (RFC 4180, séparateur auto , ou ;) ----------
+function parseCsv(text){
+  text = String(text).replace(/^﻿/, '');
+  const firstLine = text.slice(0, text.indexOf('\n') > 0 ? text.indexOf('\n') : text.length);
+  const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; }
+      else field += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === sep){ row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r'){ if (ch === '\r' && text[i+1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += ch;
+  }
+  if (field !== '' || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function csvToObjects(text){
+  const rows = parseCsv(text); if (!rows.length) return [];
+  const hdr = rows[0].map(h => h.trim());
+  return rows.slice(1).filter(r => r.some(c => c !== '')).map(r => { const o = {}; hdr.forEach((h, j) => { if (h && !(h in o)) o[h] = r[j] !== undefined ? r[j] : ''; }); return o; });
+}
+
+
+// ---- UBS PDF parser (pdf.js text items -> transactions) ----
+const UBS_MONTHS = {gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
+const UBS_NUM = /^-?\d{1,3}(?:'\d{3})*\.\d{2}$/;
+const UBS_SKIP = /Visualizzato in Assets|Pagina \d+\/\d+|Questo documento|fa fede unicamente|amministrativi, tecnici|UBS Switzerland AG|PO Box, CH-8098|www\.ubs\.com|Per tutte le vostre/;
+function ubsNum(s){ return parseFloat(s.replace(/'/g,'')); }
+
+function parseUbsPages(pages){
+  // pages: [{items:[{str,x,y,w}]}]  (y grows upward, as in PDF space)
+  let period = null, account = null, holder = null, saldo = null;
+  const txs = [];
+  let curDate = null;
+  for (const pg of pages){
+    const items = pg.items.filter(i => i.str && i.str.trim() && !UBS_SKIP.test(i.str))
+                          .map(i => ({...i, str: i.str.trim(), r: i.x + i.w}));
+    const pi = items.findIndex(i => /^Periodo:?$/.test(i.str));
+    if (pi >= 0){ const v = items.find(i => Math.abs(i.y - items[pi].y) < 2 && i.x > items[pi].x + 20); if (v) period = v.str; }
+    const ib = items.find(i => /^IBAN /.test(i.str)); if (ib) account = ib.str;
+    if (!holder){ const h = items.filter(i => i.x < 100 && i.y > 680 && i.str.length > 5 && / /.test(i.str)).sort((a, b) => b.y - a.y)[0]; if (h) holder = h.str; }
+    const sa = items.find(i => /^Saldo attuale$/i.test(i.str));
+    if (sa && saldo === null){ const v = items.find(i => i.r > 470 && UBS_NUM.test(i.str) && i.y > sa.y && i.y - sa.y < 25); if (v) saldo = ubsNum(v.str); }
+    // date headers: month item at x 80-130
+    const headers = [];
+    for (const it of items){
+      const m = it.str.match(/^([a-zà]+)(?:\s+(\d{4}))?$/i);
+      if (!m || !(m[1].toLowerCase() in UBS_MONTHS) || it.x < 75 || it.x > 140) continue;
+      const day = items.find(d => /^\d{1,2}$/.test(d.str) && d.x < 80 && Math.abs(d.y - it.y) < 14);
+      let year = m[2] ? +m[2] : null;
+      if (!year){ const yi = items.find(d => /^\d{4}$/.test(d.str) && d.x > 75 && d.x < 160 && d.y < it.y && it.y - d.y < 30); if (yi) year = +yi.str; }
+      if (!day || !year) continue;
+      headers.push({ top: Math.max(it.y, day.y), date: `${year}-${String(UBS_MONTHS[m[1].toLowerCase()]).padStart(2,'0')}-${String(+day.str).padStart(2,'0')}` });
+    }
+    headers.sort((a,b) => b.top - a.top);
+    const markers = items.filter(i => /^[A-ZÀ-Ý]$/.test(i.str) && i.x > 150 && i.x < 195).sort((a,b) => b.y - a.y);
+    for (let k = 0; k < markers.length; k++){
+      const mk = markers[k];
+      const top = mk.y + 7;
+      const nextTop = k + 1 < markers.length ? markers[k+1].y + 7 : -Infinity;
+      const bottom = Math.max(nextTop, mk.y - 30);
+      const h = headers.filter(h => h.top >= mk.y - 3);
+      if (h.length) curDate = h[h.length - 1].date;
+      const block = items.filter(i => i !== mk && i.y <= top && i.y > bottom && i.x > 190).sort((a,b) => (b.y - a.y) || (a.x - b.x));
+      const nums = block.filter(i => i.r > 470 && UBS_NUM.test(i.str));
+      const texts = block.filter(i => !(i.r > 470 && UBS_NUM.test(i.str)) && i.x < 470).map(i => i.str);
+      if (!nums.length) continue;
+      txs.push({
+        date: curDate,
+        counterparty: texts[0] || '',
+        desc: texts.slice(1).join(' '),
+        amount: ubsNum(nums[0].str),
+        balance: nums.length > 1 ? ubsNum(nums[1].str) : null,
+      });
+    }
+  }
+  // integrity check via running balance (newest first)
+  let checked = 0, breaks = 0;
+  for (let i = 0; i + 1 < txs.length; i++){
+    const a = txs[i], b = txs[i+1];
+    if (a.balance == null || b.balance == null) continue;
+    checked++;
+    if (Math.abs(b.balance + a.amount - a.balance) > 0.005) breaks++;
+  }
+  const pm = (period || '').match(/(\d{2})\.(\d{2})\.(\d{4})\s*-\s*(\d{2})\.(\d{2})\.(\d{4})/);
+  const from = pm ? `${pm[3]}-${pm[2]}-${pm[1]}` : null, to = pm ? `${pm[6]}-${pm[5]}-${pm[4]}` : null;
+  const owner = holder && / di /.test(holder) ? holder.split(/ di /).pop().trim() : null;
+  return { period, from, to, account, holder, owner, saldo, transactions: txs, checked, breaks, hasBalance: txs.some(t => t.balance !== null) };
+}
+
+
+// ===================== Contrôle paiements — moteur =====================
+// Fonctions pures : aucune donnée n'est envoyée nulle part.
+
+// ---------- utilitaires ----------
+const DAY = 86400000;
+function toDate(s){ return s ? new Date(s + 'T00:00:00Z') : null; }
+function iso(d){ return d ? d.toISOString().slice(0,10) : null; }
+function daysBetween(a, b){ return Math.round((toDate(b) - toDate(a)) / DAY); }
+function addDays(s, n){ return iso(new Date(toDate(s).getTime() + n*DAY)); }
+function fmtDate(s){ if(!s) return ''; const [y,m,d] = s.split('-'); return `${d}.${m}.${y}`; }
+function round2(x){ return Math.round(x*100)/100; }
+
+function parseAmount(v){
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if (!s) return null;
+  const m = s.replace(/CHF|Fr\.?|€/gi,'').match(/-?\d[\d'’ ]*(?:[.,]\d{1,2})?/);
+  if (!m) return null;
+  let t = m[0].replace(/['’ ]/g,'');
+  if (/,\d{1,2}$/.test(t)) t = t.replace(',', '.'); else t = t.replace(/,/g,'');
+  const n = parseFloat(t);
+  return isFinite(n) ? n : null;
+}
+
+// ---------- mois & dates dans les libellés ----------
+const MONTH_WORDS = {
+  1:['jan','janv','january','janvier','gen','genn','gennaio','januar'],
+  2:['feb','febb','february','fevrier','fév','febbraio','februar','fevr'],
+  3:['mar','march','mars','marzo','marz','märz'],
+  4:['apr','april','avril','aprile','avr'],
+  5:['may','mai','mag','maggio'],
+  6:['jun','june','juin','giu','giugno','juni'],
+  7:['jul','july','juil','juillet','lug','luglio','juli'],
+  8:['aug','august','aout','août','ago','agosto'],
+  9:['sep','sept','september','septembre','set','sett','settembre'],
+  10:['oct','october','octobre','ott','ottobre','okt','oktober'],
+  11:['nov','november','novembre'],
+  12:['dec','december','decembre','déc','dic','dicembre','dez','dezember']
+};
+const MONTH_LOOKUP = {};
+for (const [n, ws] of Object.entries(MONTH_WORDS)) for (const w of ws) MONTH_LOOKUP[deaccent(w)] = +n;
+function deaccent(s){ return String(s).normalize('NFKD').replace(/[̀-ͯ]/g,''); }
+
+function parseDateCell(v){
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return iso(new Date(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate())));
+  if (typeof v === 'number' && v > 20000 && v < 80000) return iso(new Date(Date.UTC(1899,11,30) + v*DAY));
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})/);
+  if (m){ let y = +m[3]; if (y < 100) y += 2000; const mo = +m[2], d = +m[1]; if (mo>=1&&mo<=12&&d>=1&&d<=31) return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+  return null;
+}
+
+// Déduit un mois approximatif depuis un libellé ("Gottardo June 25", "SaporiBio - 05.26", "Bally Q1 2024")
+function dateFromLabel(label){
+  const s = deaccent(String(label||'').toLowerCase());
+  let m = s.match(/\b(\d{1,2})[./](\d{2,4})\b/);
+  if (m && +m[1] >= 1 && +m[1] <= 12){ let y = +m[2]; if (y < 100) y += 2000; if (y >= 2015 && y <= 2099) return `${y}-${String(+m[1]).padStart(2,'0')}-01`; }
+  m = s.match(/\bq([1-4])\s*(\d{4})\b/);
+  if (m) return `${m[2]}-${String(+m[1]*3).padStart(2,'0')}-01`;
+  const toks = s.split(/[^a-z0-9]+/).filter(Boolean);
+  let month = null, year = null;
+  for (let i = 0; i < toks.length; i++){
+    const t = toks[i];
+    if (MONTH_LOOKUP[t] !== undefined) month = MONTH_LOOKUP[t];  // garde le dernier mois cité
+    else if (/^\d{4}$/.test(t) && +t >= 2015 && +t <= 2099) year = +t;
+    else if (/^\d{2}$/.test(t) && month !== null && i > 0 && MONTH_LOOKUP[toks[i-1]] !== undefined) year = 2000 + +t;
+  }
+  if (month && year) return `${year}-${String(month).padStart(2,'0')}-01`;
+  if (year && !month) return `${year}-12-01`;
+  return null;
+}
+
+// ---------- similarité de noms ----------
+const STOP = new Set(('sa sagl ag gmbh snc srl spa sarl ltd llc inc sas sasu kg ohg eo ' +
+  'di de del della delle dei degli da la le les il lo gli du des e et o ou und and the of von van der den dr ' +
+  'studio ufficio office comune municipio fondazione foundation stiftung event evento shop rivenditore ' +
+  'sud nord via lotto place signor signora sig famiglia fam regalo buono deg ch com org www ' +
+  'per con the torrefazione torrefattore caffe cafe coffee kaffee esperienza degustazione miscela ufficio bar ' +
+  'ristorante hotel albergo osteria').split(/\s+/));
+// prénoms courants : un prénom seul ne suffit jamais à identifier un client
+const FIRST_NAMES = new Set(('andrea alessandra alessandro alice anna antonella arianna barbara bettina bianca carla carlo chiara christian christoph ' +
+  'claudia claudio cristina daniel daniela daniele david davide diana elena elisa emma enrico fabio federica federico francesca francesco ' +
+  'giacomo gianni giorgio giovanni giulia giuseppe laura lisa luca lucia luciana luigi manuel marco maria mario martina massimo matteo ' +
+  'matthias mathias michela michele monica nicola nicolas paola paolo patrick peter pietro piero raffaele riccardo roberta roberto ruben ' +
+  'sara sarah silvia simone stefania stefano thomas valentina valeria vanessa luana ramona romana clarissa alexandra sandra susanne ' +
+  'suzanne stephanie sophie julia julien jean pierre marie anne nathalie isabelle philippe michel nicole martin markus stefan andreas ' +
+  'sabine ursula beat hans urs reto fabienne celine mathieu olivier oliver fred freddy enea tilo john james mark eva irene ilaria ivan ' +
+  'jacqueline jessica katia kevin leonardo lorenzo lorena marta mattia mirko nadia noemi pablo patrizia renato rita rosa samuele serena ' +
+  'sergio sonia tiziana valerio vittoria ylenia tosca tristana monia aira aurora gabriele gabriella graziano grazia giada consuelo morena ' +
+  'dana ricky egon yoan yanik clemence christine christophe denise sylvie lea leo noah luis jose juan carlos javier').split(/\s+/));
+function rawTokens(s){
+  const parts = deaccent(String(s||'').toLowerCase()).split(/[^a-z0-9]+/).filter(Boolean);
+  // fusionne les initiales isolées : "b r c" -> "brc"
+  const out = []; let acr = '';
+  for (const p of parts){
+    if (p.length === 1 && /[a-z]/.test(p)){ acr += p; continue; }
+    if (acr){ out.push(acr); acr = ''; }
+    out.push(p);
+  }
+  if (acr) out.push(acr);
+  return out;
+}
+function nameTokens(s){
+  return rawTokens(s).filter(t => t.length >= 3 && !STOP.has(t) && MONTH_LOOKUP[t] === undefined && !/\d/.test(t));
+}
+function lev(a, b){
+  if (a === b) return 0;
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({length:n+1}, (_,j) => j);
+  for (let i = 1; i <= m; i++){
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function tokenSim(x, y){
+  if (x === y) return 1;
+  const [s, l] = x.length <= y.length ? [x, y] : [y, x];
+  // correspondances approximatives (noms tronqués par la banque, fautes de frappe) : jamais « fortes » à elles seules
+  if (s.length >= 5 && l.startsWith(s)) return 0.6;
+  if (s.length >= 6 && l.endsWith(s)) return 0.6;
+  if (s.length >= 5 && l.length >= 5){ const r = 1 - lev(x, y) / Math.max(x.length, y.length); if (r >= 0.8) return 0.6; }
+  return 0;
+}
+function withPairs(toks){ const out = toks.slice(); for (let i = 0; i + 1 < toks.length; i++) out.push(toks[i] + toks[i+1]); return out; }
+
+class NameIndex {
+  constructor(aliases){
+    this.aliases = (aliases || []).filter(a => a && a.de && a.vers).map(a => ({ de: nameTokens(a.de), vers: nameTokens(a.vers) })).filter(a => a.de.length && a.vers.length);
+    this.df = new Map(); this.seen = new Set(); this.cache = new Map();
+  }
+  expand(name){
+    if (!this.exp) this.exp = new Map();
+    if (this.exp.has(name)) return this.exp.get(name);
+    const res = this._expand(name); this.exp.set(name, res); return res;
+  }
+  _expand(name){
+    let toks = nameTokens(name);
+    for (const a of this.aliases){
+      if (a.de.every(t => toks.includes(t)) && !a.vers.every(t => toks.includes(t))) toks = toks.concat(a.vers);
+      else if (a.vers.every(t => toks.includes(t)) && !a.de.every(t => toks.includes(t))) toks = toks.concat(a.de);
+    }
+    return [...new Set(toks)];
+  }
+  addName(name){
+    const toks = nameTokens(name); const key = toks.slice().sort().join(' ');
+    if (!key || this.seen.has(key)) return; this.seen.add(key);
+    for (const t of new Set(toks)) this.df.set(t, (this.df.get(t) || 0) + 1);
+  }
+  rarity(t){ if (FIRST_NAMES.has(t)) return 0.5; const d = this.df.get(t) || 1; return d <= 2 ? 1 : d === 3 ? 0.7 : 0.5; }
+  exactScore(a, b){
+    if (!a || !b) return 0;
+    const key = 'x' + a + '\u0000' + b; if (this.cache.has(key)) return this.cache.get(key);
+    const r = this._exactScore(a, b); this.cache.set(key, r); return r;
+  }
+  _exactScore(a, b){
+    const A = withPairs(this.expand(a)), B = new Set(withPairs(this.expand(b)));
+    let best = 0, n = 0;
+    for (const x of A) if (B.has(x)){ n++; best = Math.max(best, this.rarity(x)); }
+    return n >= 2 ? 1 : best;
+  }
+  score(a, b){
+    if (!a || !b) return 0;
+    const key = a + '\u0000' + b; if (this.cache.has(key)) return this.cache.get(key);
+    const A = withPairs(this.expand(a)), B = withPairs(this.expand(b));
+    const hits = [];
+    for (const x of A) for (const y of B){ const s = tokenSim(x, y); if (s) hits.push({ s: s * Math.min(this.rarity(x), this.rarity(y)), x, y }); }
+    hits.sort((p, q) => q.s - p.s);
+    let score = 0;
+    if (hits.length){ score = hits[0].s; const second = hits.find(h => h.x !== hits[0].x && h.y !== hits[0].y && !hits[0].x.includes(h.x) && !h.x.includes(hits[0].x)); if (second) score = Math.min(1, score + 0.25 * second.s); }
+    this.cache.set(key, score);
+    return score;
+  }
+}
+const STRONG = 0.8, WEAK = 0.45;
+
+// ---------- lecture du tracker ----------
+function cellStr(v){ return v === null || v === undefined ? '' : String(v).trim(); }
+function isYes(v){ return /^(si|sì|sí|yes|oui|ok|x)\b/i.test(cellStr(v)); }
+
+// sheets: [{name, rows: [[...]]}]
+function parseTracker(sheets){
+  const invoices = [], degust = [], notes = [];
+  let degustSheet = null;
+  for (const sh of sheets){
+    const rows = sh.rows || [];
+    const hasFattura = rows.some(r => /^fattura$/i.test(cellStr(r[0])));
+    const degHdrIdx = rows.findIndex(r => r.some(c => /^order from$/i.test(cellStr(c))) && r.some(c => /^amount$/i.test(cellStr(c))));
+    if (hasFattura){
+      let section = 'open', hdr = null;
+      for (let i = 0; i < rows.length; i++){
+        const r = rows[i]; const c0 = cellStr(r[0]);
+        if (/^opened?$/i.test(c0) || /^aperte?$/i.test(c0)){ section = 'open'; continue; }
+        if (/^closed?$/i.test(c0) || /^chiuse?$/i.test(c0)){ section = 'closed'; continue; }
+        if (/^notes?$/i.test(c0)){ section = 'notes'; continue; }
+        if (/^fattura$/i.test(c0)){
+          hdr = {}; r.forEach((c, j) => { const k = deaccent(cellStr(c).toLowerCase()); if (k) hdr[k] = j; });
+          continue;
+        }
+        if (section === 'notes'){ if (r.some(c => cellStr(c))) notes.push(r.map(cellStr).filter(Boolean).join(' ')); continue; }
+        if (!hdr) continue;
+        const col = (re) => { for (const [k, j] of Object.entries(hdr)) if (re.test(k)) return j; return -1; };
+        const iChi = col(/^chi/), iTot = col(/^total/), iInv = col(/^inviat/), iPag = col(/^pagat/), iShop = col(/^shopify/), iNote = col(/^note/), iData = col(/^(data|date)$/);
+        const num = c0, chi = cellStr(r[iChi]);
+        if (!num && !chi) continue;
+        if (!chi && !/\d/.test(num)) continue;
+        const amount = parseAmount(r[iTot]);
+        const noteParts = [];
+        const noteFrom = iNote >= 0 ? iNote : Math.max(iShop, iPag, iInv, iTot) + 1;
+        for (let j = noteFrom; j < r.length; j++){ if (cellStr(r[j])) noteParts.push(cellStr(r[j])); }
+        const explicitDate = iData >= 0 ? parseDateCell(r[iData]) : null;
+        const labelDate = dateFromLabel(chi);
+        invoices.push({
+          kind: 'facture', id: /\d/.test(num) ? num : '', client: chi.replace(/\s+/g,' ').replace(/\s*-\s*$/,'').trim(), amount,
+          sent: cellStr(r[iInv]), paidMark: cellStr(r[iPag]), shopifyMark: cellStr(r[iShop]),
+          note: noteParts.join(' · '), section,
+          date: explicitDate || labelDate, dateApprox: !explicitDate && !!labelDate,
+          sheet: sh.name, row: i + 1
+        });
+      }
+    } else if (degHdrIdx >= 0){
+      const hdr = {}; rows[degHdrIdx].forEach((c, j) => { const k = deaccent(cellStr(c).toLowerCase()); if (k && !(k in hdr)) hdr[k] = j; });
+      const score = Object.keys(hdr).length + (('status' in hdr) ? 1 : 0);
+      if (!degustSheet || score >= degustSheet.score) degustSheet = { sh, hdr, start: degHdrIdx + 1, score };
+    }
+  }
+  if (degustSheet){
+    const { sh, hdr, start } = degustSheet; const rows = sh.rows;
+    const g = (r, k) => hdr[k] !== undefined ? r[hdr[k]] : '';
+    for (let i = start; i < rows.length; i++){
+      const r = rows[i];
+      const who = cellStr(g(r,'order from')).replace(/\s+/g,' '), details = cellStr(g(r,'details')).replace(/\s+/g,' ');
+      const amtRaw = cellStr(g(r,'amount'));
+      if (!who && !details && !amtRaw) continue;
+      const free = /free|gratuit|gratis|omaggio/i.test(amtRaw);
+      degust.push({
+        kind: 'degustazione', client: who === '?' ? '' : who, details, amount: free ? 0 : parseAmount(amtRaw), amountRaw: amtRaw, free,
+        eventDate: parseDateCell(g(r,'event date')), eventRaw: cellStr(g(r,'event date')),
+        shopifyMark: cellStr(g(r,'shopify')), paidRaw: cellStr(g(r,'paid')), paidDate: parseDateCell(g(r,'paid')),
+        statusMark: cellStr(g(r,'status')),
+        emails: (cellStr(g(r,'email shopify')).match(/[^\s,;]+@[^\s,;]+/g) || []).map(e => e.toLowerCase()),
+        sheet: sh.name, row: i + 1
+      });
+    }
+  }
+  return { invoices, degust, notes, degustSheet: degustSheet ? degustSheet.sh.name : null };
+}
+
+// ---------- lecture de l'export Shopify ----------
+const GENERIC_MAIL = /^(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|bluewin|gmx|web|protonmail|proton|pm|sunrise|hispeed|swissonline|libero|tiscali|virgilio|alice|tim|fastwebnet|orange|free|wanadoo|sfr|laposte|aol|mail|email|netc|tele2|vtxmail|ticino|ti|cablecom|freesurf|bluemail|green|tutanota|t-online)$/i;
+function emailDomainName(email){
+  const m = String(email || '').toLowerCase().match(/@([a-z0-9.-]+)\.[a-z]+$/); if (!m) return '';
+  const parts = m[1].split('.'); const d = parts[parts.length - 1];
+  return GENERIC_MAIL.test(d) || d.length < 4 ? '' : d;
+}
+function parseShopify(rows){
+  // rows : objets {colonne: valeur} (CSV avec en-têtes)
+  if (!rows.length) return { orders: [], format: null };
+  const keys = Object.keys(rows[0]);
+  const pick = (...names) => { for (const n of names){ const k = keys.find(k => k.trim().toLowerCase() === n.toLowerCase()); if (k) return k; } return null; };
+  const kName = pick('Order name','Name','Order','Commande');
+  const kEmail = pick('Customer email','Email');
+  const kCust = pick('Customer name','Billing Name','Customer','Client');
+  const kDate = pick('Day','Date','Created at','Month','Week','Mois','Jour');
+  const kStatus = pick('Order payment status','Financial Status','Payment status');
+  const kTotal = pick('Total sales','Total');
+  const kOrders = pick('Orders');
+  if (!kName || !kTotal) throw new Error("Export Shopify : colonnes « Order name » et « Total sales » introuvables.");
+  const by = new Map();
+  for (const r of rows){
+    const name = cellStr(r[kName]); if (!name) continue;
+    const status = kStatus ? cellStr(r[kStatus]).toLowerCase() : '';
+    const total = parseAmount(r[kTotal]) || 0;
+    const ord = kOrders ? (parseAmount(r[kOrders]) || 0) : 1;
+    if (!status && !total && !ord) continue;           // lignes vides du croisement commande × mois
+    const date = parseDateCell(r[kDate]);
+    let o = by.get(name);
+    if (!o){ o = { name, email: '', customer: '', status, date, amount: null, net: 0, rows: 0 }; by.set(name, o); }
+    o.rows++;
+    if (kEmail && !o.email) o.email = cellStr(r[kEmail]).toLowerCase();
+    if (kCust && !o.customer) o.customer = cellStr(r[kCust]);
+    if (status) o.status = status;
+    if (date && (!o.date || date < o.date)){ o.date = date; }
+    if (ord > 0 || o.amount === null) o.amount = (o.amount === null || ord > 0) ? total : o.amount;
+    o.net = round2(o.net + total);
+  }
+  const orders = [...by.values()].map(o => ({ ...o, amount: round2(o.amount || 0), match: [o.customer, emailDomainName(o.email)].filter(Boolean).join(' ') }));
+  orders.sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.name.localeCompare(b.name, undefined, {numeric:true}));
+  return { orders, format: kDate === 'Month' || /month/i.test(kDate || '') ? 'mensuel' : 'jour' };
+}
+
+// ---------- catégories UBS ----------
+function classifyUbs(tx, ignoreIdx, ignoreNames){
+  const cp = tx.counterparty || '';
+  if (tx.amount < 0) return 'sortie';
+  if (/stripe/i.test(cp)) return 'stripe';
+  if (/twint/i.test(cp)) return 'twint';
+  if (/paypal/i.test(cp)) return 'paypal';
+  if (/schaltereinzahlung|versamento in contanti|dépôt|depot espèces/i.test(cp)) return 'especes';
+  if (!cp || /^regolamenti diversi$/i.test(cp)) return 'anonyme';
+  for (const n of ignoreNames) if (ignoreIdx.score(cp, n) >= STRONG || deaccent(cp.toLowerCase()).includes(deaccent(n.toLowerCase()))) return 'interne';
+  return 'client';
+}
+
+// ---------- rapprochement ----------
+function bestCombo(items, target, getAmt, maxN){
+  // plus ancienne combinaison de 2 à maxN éléments dont la somme = target (±0.05)
+  const n = Math.min(items.length, 8);
+  for (let size = 2; size <= maxN; size++){
+    const rec = (startIdx, chosen, sum) => {
+      if (chosen.length === size) return Math.abs(sum - target) <= 0.05 ? chosen.slice() : null;
+      for (let i = startIdx; i < n; i++){ chosen.push(items[i]); const r = rec(i + 1, chosen, sum + getAmt(items[i])); chosen.pop(); if (r) return r; }
+      return null;
+    };
+    const r = rec(0, [], 0); if (r) return r;
+  }
+  return null;
+}
+
+function reconcile({ invoices, degust, orders, ubs, config }){
+  config = config || {};
+  const aliases = config.alias || [];
+  const ignoreNames = (config.ignorer || []).concat(ubs.owners || []).filter(Boolean);
+  const delai = config.delaiRelance || 30;
+  const idx = new NameIndex(aliases);
+  const ignoreIdx = new NameIndex([]);
+
+  const txs = ubs.transactions.map((t, i) => ({ ...t, id: 'u' + i }));
+  for (const t of txs) t.cat = classifyUbs(t, ignoreIdx, ignoreNames);
+  const credits = txs.filter(t => t.cat === 'client').sort((a, b) => a.date.localeCompare(b.date));
+  const ubsStart = txs.reduce((m, t) => !m || t.date < m ? t.date : m, null);
+  const asOf = txs.reduce((m, t) => !m || t.date > m ? t.date : m, null);
+  const shopStart = orders.reduce((m, o) => o.date && (!m || o.date < m) ? o.date : m, null);
+  const dataStart = [ubsStart, shopStart].filter(Boolean).sort()[0] || null;
+
+  for (const x of invoices) idx.addName(x.client);
+  for (const x of degust) idx.addName(x.client);
+  for (const o of orders){ idx.addName(o.customer); if (o.match !== o.customer) idx.addName(emailDomainName(o.email)); }
+  for (const t of credits) idx.addName(t.counterparty);
+
+  const inv = invoices.map((x, i) => ({ ...x, uid: 'f' + i, payments: [], order: null, flags: [] }));
+  const deg = degust.map((x, i) => ({ ...x, emails: x.emails || [], uid: 'd' + i, payments: [], orderLinks: [], flags: [], orderEcart: 0 }));
+  const ords = orders.map((o, i) => ({ ...o, uid: 'o' + i, linkedTo: null, payments: [] }));
+  for (const c of credits){ c.usedBy = []; c.used = 0; }
+  const byUid = new Map(); for (const x of inv.concat(deg, ords)) byUid.set(x.uid, x);
+
+  const near = (a, b, days) => !a || !b || Math.abs(daysBetween(a, b)) <= days;
+
+  // A. facture ↔ commande Shopify (même client, même montant, mois proche)
+  const linkInvoiceOrders = (list) => {
+    for (const x of list){
+      if (x.amount === null) continue;
+      let best = null;
+      const anonSame = ords.filter(o => !o.linkedTo && !o.customer && Math.abs(o.amount - x.amount) <= 0.05);
+      for (const o of ords){
+        if (o.linkedTo || Math.abs(o.amount - x.amount) > 0.05) continue;
+        if (!near(x.date, o.date, 75)) continue;
+        const s = o.match ? idx.score(x.client, o.match) : 0;
+        const anon = !o.customer && (x.date ? near(x.date, o.date, 60) : anonSame.length === 1);
+        if (s < WEAK && !anon) continue;
+        const dist = x.date && o.date ? Math.abs(daysBetween(x.date, o.date)) : 999;
+        const key = [s >= STRONG ? 0 : 1, anon ? 1 : 0, dist];
+        if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && (key[1] < best.key[1] || (key[1] === best.key[1] && key[2] < best.key[2])))) best = { o, key };
+      }
+      if (best){ x.order = best.o; best.o.linkedTo = x.uid; if (!x.date){ x.date = best.o.date; x.dateApprox = true; x.dateFromShopify = true; } }
+    }
+  };
+  linkInvoiceOrders(inv.filter(x => x.date));
+
+  // A'. dégustation ↔ commande(s) Shopify (email ou nom, montant, date de paiement)
+  const degCands = (d, ref, win) => ords.filter(o => !o.linkedTo && o.amount > 0 && (!ref || near(ref, o.date, win)))
+      .map(o => ({ o, s: (o.email && d.emails.includes(o.email)) ? 1 : idx.score(d.client, o.match) }))
+      .filter(e => e.s >= WEAK)
+      .sort((a, b) => b.s - a.s || (ref && a.o.date && b.o.date ? Math.abs(daysBetween(ref, a.o.date)) - Math.abs(daysBetween(ref, b.o.date)) : 0));
+  const pass1 = [];
+  for (const d of deg){
+    if (d.free || d.amount === null || !d.amount) continue;
+    const ref = d.paidDate || d.eventDate;
+    const cands = degCands(d, ref, 60);
+    const exact = cands.find(e => Math.abs(e.o.amount - d.amount) <= 0.05);
+    if (exact){ d.orderLinks.push(exact.o); exact.o.linkedTo = d.uid; continue; }
+    // une ligne payée en plusieurs commandes (ex. 2 participants × 80)
+    const strong = cands.filter(e => e.s >= STRONG).map(e => e.o);
+    const combo = bestCombo(strong, d.amount, o => o.amount, 3);
+    if (combo){ for (const o of combo){ d.orderLinks.push(o); o.linkedTo = d.uid; } continue; }
+    pass1.push(d);
+  }
+  // plusieurs bons payés en une seule commande (même email, même date)
+  const groups = new Map();
+  for (const d of pass1){ if (!d.emails.length) continue; const k = d.emails[0] + '|' + (d.paidDate || ''); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(d); }
+  for (const [, g] of groups){
+    if (g.length < 2) continue;
+    const sum = round2(g.reduce((a, d) => a + d.amount, 0));
+    const ref = g[0].paidDate || g[0].eventDate;
+    const o = ords.find(o => !o.linkedTo && g[0].emails.includes(o.email) && Math.abs(o.amount - sum) <= Math.max(1, sum * 0.1) && (!ref || near(ref, o.date, 60)));
+    if (o){ o.linkedTo = g[0].uid; for (const d of g){ d.orderLinks.push(o); d.groupSum = sum; if (Math.abs(o.amount - sum) > 0.05){ d.flags.push(`une commande Shopify de ${o.amount.toFixed(2)} pour ${g.length} bons totalisant ${sum.toFixed(2)}`); d.orderEcart = round2(o.amount - sum); } } }
+  }
+  // montant différent mais même client et même période
+  for (const d of pass1){
+    if (d.orderLinks.length) continue;
+    const ref = d.paidDate || d.eventDate;
+    const tol = degCands(d, ref, 45).filter(e => e.s >= STRONG && Math.abs(e.o.amount - d.amount) <= d.amount * 0.25);
+    if (tol.length){ const o = tol[0].o; d.orderLinks.push(o); o.linkedTo = d.uid; d.orderEcart = round2(o.amount - d.amount); d.flags.push(`commande ${o.name} de ${o.amount.toFixed(2)} au lieu de ${d.amount.toFixed(2)}`); }
+  }
+  linkInvoiceOrders(inv.filter(x => !x.date));
+
+  // B. factures ↔ virements UBS (premier arrivé, premier servi par client)
+  const invNames = (x) => [x.client, x.order && x.order.match].filter(Boolean);
+  const nameScoreInv = (x, cp) => Math.max(...invNames(x).map(n => idx.score(n, cp)));
+  const assign = (c, items, ecart) => {
+    c.used = round2(items.reduce((a, x) => a + (x.amount || 0), 0));
+    for (const x of items){ x.payments.push({ date: c.date, amount: c.amount, from: c.counterparty, tx: c.id, ecart: ecart ? round2(c.amount - x.amount) : 0, groupe: items.length > 1 ? items.length : 0 }); c.usedBy.push(x.uid); }
+  };
+  const payable = (x) => x.amount !== null && x.amount > 0 && !x.payments.length;
+  const pool = inv.concat(deg.filter(d => !d.orderLinks.length));
+  for (const c of credits){
+    const cands = pool.filter(x => payable(x) && (!x.date || (x.date <= addDays(c.date, 10) && daysBetween(x.date, c.date) <= 540)))
+                      .map(x => ({ x, s: nameScoreInv(x, c.counterparty), d: idx.score(x.client, c.counterparty) })).filter(e => e.s >= WEAK);
+    if (!cands.length) continue;
+    const byAge = (a, b) => (b.s >= STRONG) - (a.s >= STRONG) || (b.d >= STRONG) - (a.d >= STRONG) || (a.x.date || '9999').localeCompare(b.x.date || '9999');
+    const exact = cands.filter(e => Math.abs(e.x.amount - c.amount) <= 0.05).sort(byAge);
+    if (exact.length){ assign(c, [exact[0].x], false); continue; }
+    const strong = cands.filter(e => e.s >= STRONG).sort(byAge).map(e => e.x);
+    const combo = bestCombo(strong, c.amount, x => x.amount, 3);
+    if (combo){ assign(c, combo, false); continue; }
+    const tol = cands.filter(e => e.s >= STRONG && Math.abs(e.x.amount - c.amount) <= Math.max(2, e.x.amount * 0.12)).sort(byAge);
+    if (tol.length) assign(c, [tol[0].x], true);
+  }
+
+  // C. virements restants ↔ commandes Shopify (clients qui paient par virement)
+  for (const c of credits){
+    if (c.usedBy.length) continue;
+    const cands = ords.filter(o => !o.linkedTo && !o.payments.length && o.amount > 0 && o.date && o.date <= addDays(c.date, 7) && daysBetween(o.date, c.date) <= 150)
+                      .map(o => ({ o, s: idx.score(o.match, c.counterparty) })).filter(e => e.s >= WEAK);
+    if (!cands.length) continue;
+    const byAge = (a, b) => (b.s >= STRONG) - (a.s >= STRONG) || b.s - a.s || a.o.date.localeCompare(b.o.date);
+    const exact = cands.filter(e => Math.abs(e.o.amount - c.amount) <= 0.05).sort(byAge);
+    let pick = exact.length ? [exact[0].o] : null, ecart = false;
+    if (!pick){ pick = bestCombo(cands.filter(e => e.s >= STRONG).sort(byAge).map(e => e.o), c.amount, o => o.amount, 3); }
+    if (!pick){ const tol = cands.filter(e => e.s >= STRONG && Math.abs(e.o.amount - c.amount) <= Math.max(2, e.o.amount * 0.12)).sort(byAge); if (tol.length){ pick = [tol[0].o]; ecart = true; } }
+    if (pick){ c.used = round2(pick.reduce((a, o) => a + o.amount, 0)); for (const o of pick){ o.payments.push({ date: c.date, amount: c.amount, from: c.counterparty, tx: c.id, groupe: pick.length > 1 ? pick.length : 0, ecart: ecart ? round2(c.amount - o.amount) : 0 }); c.usedBy.push(o.uid); } }
+  }
+
+  // D. payeurs (clients qui paient par virement) et leurs clients Shopify
+  const payers = [];
+  for (const c of credits){
+    let p = payers.find(p => p.names.some(n => n === c.counterparty || idx.score(n, c.counterparty) >= STRONG));
+    if (!p){ p = { names: [], credits: [], customers: new Set(), invoiceClients: new Set() }; payers.push(p); }
+    if (!p.names.includes(c.counterparty)) p.names.push(c.counterparty);
+    p.credits.push(c);
+  }
+  const custMatch = new Map(); for (const o of ords) if (o.customer && !custMatch.has(o.customer)) custMatch.set(o.customer, o.match || o.customer);
+  const allCustomers = [...custMatch.keys()];
+  for (const p of payers){
+    const hits = new Map();
+    for (const c of p.credits) for (const u of c.usedBy){
+      const x = byUid.get(u); if (!x) continue;
+      const cu = x.customer || (x.order && x.order.customer);
+      if (cu) hits.set(cu, (hits.get(cu) || 0) + 1);
+      if (x.kind === 'facture') p.invoiceClients.add(x.client);
+    }
+    // client Shopify rattaché au payeur : nom clairement identique, ou au moins 2 paiements rapprochés
+    for (const cu of allCustomers) if ((hits.get(cu) || 0) >= 2 || p.names.some(n => idx.score(n, custMatch.get(cu)) >= STRONG)) p.customers.add(cu);
+    for (const [cu, n] of hits) if (n >= 1 && p.names.some(nm => idx.score(nm, custMatch.get(cu) || cu) >= WEAK)) p.customers.add(cu);
+  }
+  const payerOfCustomer = (cu) => payers.find(p => p.customers.has(cu));
+
+  // E. emails clients (pour les relances) : l'adresse la plus utilisée par ce client
+  const emailFor = (names) => {
+    for (const n of names){
+      if (!n) continue;
+      const cnt = new Map();
+      for (const o of ords) if (o.email && idx.exactScore(n, o.match) >= STRONG) cnt.set(o.email, (cnt.get(o.email) || 0) + 1);
+      if (cnt.size) return [...cnt.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    }
+    return '';
+  };
+
+  // ---------- statuts ----------
+  const out = [];
+  const age = (d) => d && asOf ? daysBetween(d, asOf) : null;
+  const shopTxt = (o) => o ? `${o.name} (${o.status || '?'})` : '';
+  const payTxt = (p) => `${fmtDate(p.date)} · ${p.from}${p.groupe ? ` (virement groupé ×${p.groupe})` : ''}${p.ecart ? ` · écart ${p.ecart > 0 ? '+' : ''}${p.ecart.toFixed(2)}` : ''}`;
+  const payersByInvoiceClient = (x) => payers.filter(p => p.invoiceClients.has(x.client) || p.names.some(n => idx.score(x.client, n) >= STRONG));
+
+  for (const x of inv){
+    const r = { type: 'Facture', ref: x.id || '–', client: x.client, montant: x.amount, date: x.date, dateApprox: x.dateApprox, age: age(x.date),
+                shopify: shopTxt(x.order), email: (x.order && x.order.email) || emailFor(invNames(x)), tracker: x.section === 'closed' ? 'Closed' : 'Opened', note: x.note, paiement: x.payments.map(payTxt).join(' + '), src: x, flags: [] };
+    const paid = x.payments.length > 0, ecart = x.payments.some(p => p.ecart);
+    const notePaypal = /paypal/i.test(x.note + ' ' + x.sent), noteCleme = /cleme|clémence/i.test(x.note);
+    if (x.section === 'closed'){
+      if (paid){ r.statut = ecart ? 'verifier' : 'ok'; r.raison = ecart ? 'Payée avec un écart de montant' : 'Payée'; }
+      else if (notePaypal){ r.statut = 'info'; r.raison = 'Payée via PayPal (hors UBS)'; }
+      else if (noteCleme){ r.statut = 'info'; r.raison = 'Payée sur le compte de Clémence'; }
+      else if (x.date && ubsStart && x.date < addDays(ubsStart, -45)){ r.statut = 'info'; r.raison = 'Antérieure aux relevés UBS chargés'; }
+      else { r.statut = 'info'; r.raison = 'Fermée, aucun virement UBS trouvé (TWINT, carte ou espèces ?)'; }
+    } else {
+      // une autre facture du même client, même montant, a pris le seul virement → doublon ?
+      const twin = inv.find(y => y !== x && y.section === 'open' && y.payments.length && y.amount === x.amount && (!x.date || !y.date || x.dateFromShopify || y.dateFromShopify || Math.abs(daysBetween(x.date, y.date)) <= 20)
+                                 && y.payments.some(p => idx.score(x.client, p.from) >= STRONG || (x.order && idx.score(x.order.customer, p.from) >= STRONG)));
+      if (paid){ r.statut = ecart ? 'verifier' : 'fermer'; r.raison = ecart ? 'Virement reçu avec un écart de montant — à vérifier puis fermer' : 'Virement reçu — à passer en Closed'; }
+      else if (x.amount === null){ r.statut = 'verifier'; r.raison = 'Montant manquant dans le tracker'; }
+      else if (notePaypal){ r.statut = 'verifier'; r.raison = 'Paiement PayPal annoncé — à contrôler dans PayPal'; }
+      else if (noteCleme){ r.statut = 'verifier'; r.raison = 'Paiement annoncé sur le compte de Clémence'; }
+      else if (twin){ r.statut = 'verifier'; r.raison = `Un seul virement reçu pour 2 factures de ${x.amount.toFixed(2)} (avec ${twin.id || twin.client}) — doublon ?`; }
+      else if (isYes(x.paidMark)){ r.statut = 'verifier'; r.raison = 'Marquée « Pagata » mais aucun virement UBS trouvé'; }
+      else if (!x.id && x.order && x.order.status === 'paid'){ r.statut = 'verifier'; r.raison = 'Sans n° de facture, payée selon Shopify (TWINT ou carte ?)'; }
+      else if (r.age !== null && r.age < delai){ r.statut = 'attente'; r.raison = `Envoyée il y a ${r.age} j — dans le délai`; }
+      else { r.statut = 'relancer'; r.raison = r.age !== null ? `Aucun paiement trouvé depuis ${r.age} jours` : 'Aucun paiement trouvé (date inconnue)'; if (x.order && x.order.status === 'paid') r.flags.push('marquée payée dans Shopify'); }
+      if (!x.order && x.amount !== null) r.flags.push('pas de commande Shopify correspondante');
+    }
+    out.push(r);
+  }
+
+  for (const d of deg){
+    const o = d.orderLinks[0];
+    const ref = d.paidDate || d.eventDate;
+    const r = { type: 'Dégustation', ref: d.details ? d.details.slice(0, 70) : '–', client: d.client || '?', montant: d.amount, date: ref, age: null,
+                shopify: d.orderLinks.length ? [...new Set(d.orderLinks)].map(shopTxt).join(' + ') : (d.shopifyMark ? `tracker : ${d.shopifyMark}` : ''),
+                email: d.emails[0] || (o && o.email) || emailFor([d.client]), tracker: d.paidRaw, note: d.flags.join(' · '), paiement: d.payments.map(payTxt).join(' + '), src: d, flags: [] };
+    if (d.free){ r.statut = 'info'; r.raison = 'Gratuit'; }
+    else if (d.amount === null){ r.statut = 'verifier'; r.raison = 'Ligne incomplète (client ou montant manquant)'; }
+    else if (o && /pending|partially_paid|authorized/.test(o.status)){ r.statut = 'relancer'; r.raison = `Commande Shopify ${o.name} en attente de paiement`; }
+    else if (o && d.orderEcart < -0.05){ r.statut = 'verifier'; r.raison = `Commande Shopify trouvée mais montant inférieur (${d.orderEcart.toFixed(2)})`; }
+    else if (o){ r.statut = 'ok'; r.raison = `Payée via Shopify`; }
+    else if (d.payments.length){ r.statut = 'ok'; r.raison = 'Payée par virement'; }
+    else if (ref && dataStart && ref < dataStart){ r.statut = 'info'; r.raison = 'Antérieure aux exports chargés'; }
+    else if (/after the event|dopo|après/i.test(d.paidRaw)){ r.statut = 'verifier'; r.raison = 'Paiement attendu après l’événement — aucun virement trouvé'; }
+    else if (/check|\?/i.test(d.paidRaw) || !d.paidRaw){ r.statut = 'verifier'; r.raison = 'Aucune commande Shopify ni virement trouvé'; }
+    else { r.statut = 'verifier'; r.raison = 'Marquée payée dans le tracker, mais aucune trace Shopify/UBS'; }
+    out.push(r);
+  }
+
+  for (const o of ords){
+    if (!/pending|partially_paid|authorized/.test(o.status)) continue;
+    const linked = o.linkedTo ? byUid.get(o.linkedTo) : null;
+    const pays = linked ? linked.payments : o.payments;
+    const r = { type: 'Commande Shopify', ref: o.name, client: o.customer || '(sans nom)', montant: o.amount, date: o.date, dateApprox: true, age: age(o.date), shopify: shopTxt(o), email: o.email,
+                tracker: linked ? (linked.id || linked.client) : '', note: linked && linked.client ? `liée à ${linked.kind === 'facture' ? 'la facture' : 'la dégustation'} ${linked.id || linked.client}` : '', paiement: pays.map(payTxt).join(' + '), src: o, flags: [] };
+    if (pays.length){ r.statut = 'verifier'; r.raison = 'Virement reçu mais commande encore « en attente » dans Shopify — à marquer payée'; }
+    else if (linked){ continue; }  // déjà suivie via la facture / la dégustation
+    else { r.statut = r.age !== null && r.age < delai ? 'attente' : 'relancer'; r.raison = `Commande en attente de paiement (${o.status})`; }
+    out.push(r);
+  }
+
+  // clients par virement : commandé vs reçu
+  const ledger = payers.filter(p => p.customers.size).map(p => {
+    const custOrders = ords.filter(o => p.customers.has(o.customer) && o.amount > 0 && o.date && o.date >= addDays(ubsStart, -15));
+    const isPaid = (o) => o.payments.length || (o.linkedTo && (byUid.get(o.linkedTo) || {}).payments && byUid.get(o.linkedTo).payments.length);
+    const unmatched = custOrders.filter(o => !isPaid(o) && o.date <= addDays(asOf, -delai));
+    const recu = round2(p.credits.reduce((a, c) => a + c.amount, 0));
+    const commande = round2(custOrders.reduce((a, o) => a + o.amount, 0));
+    const last = p.credits[p.credits.length - 1];
+    return { payeur: p.names.join(' / '), clientsShopify: [...p.customers], nbVirements: p.credits.length, recu, commande, dernier: last.date,
+             commandes: custOrders.length, commandesPayees: custOrders.filter(isPaid).length,
+             sansVirement: unmatched.map(o => ({ name: o.name, date: o.date, amount: o.amount, status: o.status })),
+             montantSansVirement: round2(unmatched.reduce((a, o) => a + o.amount, 0)),
+             virementsLibres: p.credits.filter(c => !c.usedBy.length).map(c => ({ date: c.date, amount: c.amount })) };
+  }).sort((a, b) => b.montantSansVirement - a.montantSansVirement || b.recu - a.recu);
+
+  const unidentified = credits.filter(c => !c.usedBy.length && !payers.some(p => p.customers.size && p.credits.includes(c)))
+                              .map(c => ({ date: c.date, montant: c.amount, de: c.counterparty, libelle: c.desc }));
+  const others = txs.filter(t => ['paypal','especes','interne'].includes(t.cat) && t.amount > 0).map(t => ({ date: t.date, montant: t.amount, de: t.counterparty, cat: t.cat }));
+  const totals = {}; for (const t of txs) if (t.amount > 0){ totals[t.cat] = round2((totals[t.cat] || 0) + t.amount); }
+
+  return { rows: out, ledger, unidentified, others, totals, asOf, ubsStart, shopStart, counts: { ubs: txs.length, credits: credits.length, factures: inv.length, degust: deg.length, commandes: ords.length } };
+}
+
+
+
+// ===================== Contrôle paiements — interface =====================
+(function(){
+  if (typeof document === 'undefined') return;
+  if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const chf = (n) => n === null || n === undefined || isNaN(n) ? '' : (n < 0 ? '-' : '') + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
+  const LABEL = { relancer: 'À relancer', verifier: 'À vérifier', fermer: 'Payée · à fermer', ok: 'Payée', info: 'Info', attente: 'Dans le délai' };
+
+  // ---------- paramètres ----------
+  const CFG_KEY = 'caffesuiso-controle-paiements-v1';
+  const DEFAULT_CFG = { alias: [], ignorer: [], delaiRelance: 30 };
+  let config = loadConfig();
+  function loadConfig(){
+    try { const raw = localStorage.getItem(CFG_KEY); if (raw) return { ...DEFAULT_CFG, ...JSON.parse(raw) }; } catch (e) {}
+    return { ...DEFAULT_CFG };
+  }
+  function saveConfig(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(config)); } catch (e) {} }
+
+  // ---------- état ----------
+  const state = { tracker: [], ubs: [], shopify: null, result: null, tab: 'relancer', selected: new Set() };
+
+  // ---------- lecture des fichiers ----------
+  async function readTracker(file){
+    if (/\.csv$/i.test(file.name)) return [{ name: file.name, rows: parseCsv(await file.text()) }];
+    const wb = XLSX.read(await file.arrayBuffer(), { cellDates: true });
+    return wb.SheetNames.map(n => ({ name: n, rows: XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: true, defval: '' }) }));
+  }
+  async function readUbs(file){
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    const pages = [];
+    for (let p = 1; p <= doc.numPages; p++){
+      const tc = await (await doc.getPage(p)).getTextContent();
+      pages.push({ items: tc.items.map(i => ({ str: i.str, x: i.transform[4], y: i.transform[5], w: i.width })) });
+    }
+    return { name: file.name, ...parseUbsPages(pages) };
+  }
+  async function readShopify(file){ return { name: file.name, ...parseShopify(csvToObjects(await file.text())) }; }
+
+  function mergeUbs(){
+    const files = state.ubs.slice().sort((a, b) => (a.from || '').localeCompare(b.from || ''));
+    const txs = []; let coveredTo = null; const notes = [];
+    let prevEnd = null, chainOk = true, verified = 0;
+    for (const f of files){
+      const keep = f.transactions.filter(t => !coveredTo || t.date > coveredTo);
+      if (keep.length < f.transactions.length) notes.push(`${f.name} : ${f.transactions.length - keep.length} mouvements déjà présents ignorés`);
+      // continuité des soldes entre relevés
+      const oldest = f.transactions[f.transactions.length - 1];
+      if (f.hasBalance && oldest && oldest.balance !== null){
+        const before = Math.round((oldest.balance - oldest.amount) * 100) / 100;
+        if (prevEnd !== null && keep.length === f.transactions.length && Math.abs(before - prevEnd) > 0.01) chainOk = false;
+        prevEnd = f.transactions[0].balance; verified += f.checked;
+        if (f.breaks) chainOk = false;
+      } else if (prevEnd !== null && f.saldo !== null){
+        const sum = keep.reduce((a, t) => a + t.amount, 0);
+        if (Math.abs(prevEnd + sum - f.saldo) > 0.01) chainOk = false; else verified += keep.length;
+        prevEnd = f.saldo;
+      }
+      txs.push(...keep);
+      if (f.to && (!coveredTo || f.to > coveredTo)) coveredTo = f.to;
+    }
+    const owners = [...new Set(files.map(f => f.owner).filter(Boolean))];
+    return { transactions: txs, owners, chainOk, verified, notes, from: files[0] && files[0].from, to: coveredTo };
+  }
+
+  // ---------- zones de dépôt ----------
+  for (const zone of $$('.drop')){
+    const kind = zone.dataset.kind, input = $('input[type=file]', zone);
+    input.addEventListener('change', () => { handleFiles(kind, [...input.files]); input.value = ''; });
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+    zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('over'); handleFiles(kind, [...e.dataTransfer.files]); });
+  }
+  async function handleFiles(kind, files){
+    if (!files.length) return;
+    const st = $(`[data-status="${kind}"]`);
+    st.innerHTML = 'Lecture…';
+    try {
+      if (kind === 'tracker'){
+        state.tracker = [];
+        for (const f of files) state.tracker.push(...await readTracker(f));
+        const t = parseTracker(state.tracker);
+        const open = t.invoices.filter(x => x.section === 'open').length;
+        if (!t.invoices.length) throw new Error('aucune facture trouvée (il faut une ligne d’en-tête « Fattura »)');
+        st.innerHTML = `<span class="okline">✓ ${t.invoices.length} factures (${open} ouvertes)</span> · ${t.degust.length} dégustations${t.degustSheet ? ` (onglet « ${esc(t.degustSheet)} »)` : ''}`;
+      } else if (kind === 'ubs'){
+        for (const f of files){ const r = await readUbs(f); state.ubs = state.ubs.filter(u => u.name !== r.name); state.ubs.push(r); }
+        const m = mergeUbs();
+        st.innerHTML = `<span class="okline">✓ ${state.ubs.length} relevé(s) · ${m.transactions.length} mouvements</span><br>du ${fmtDate(m.from)} au ${fmtDate(m.to)} · ` +
+          (m.chainOk ? '<span class="okline">soldes vérifiés</span>' : '<span class="warn">soldes à contrôler (relevé manquant ?)</span>') +
+          ` <button class="linkbtn" id="clearUbs">vider</button>`;
+        $('#clearUbs').onclick = () => { state.ubs = []; st.textContent = 'Aucun fichier'; $('.drop[data-kind=ubs]').classList.remove('loaded'); updateRun(); };
+      } else if (kind === 'shopify'){
+        state.shopify = await readShopify(files[0]);
+        const n = state.shopify.orders.length, d = state.shopify.orders.map(o => o.date).filter(Boolean).sort();
+        st.innerHTML = `<span class="okline">✓ ${n} commandes</span> · du ${fmtDate(d[0])} au ${fmtDate(d[d.length - 1])}` + (state.shopify.format === 'mensuel' ? '<br><span class="warn">dates au mois près (ajoute « Day » au rapport pour plus de précision)</span>' : '');
+      }
+      $(`.drop[data-kind=${kind}]`).classList.add('loaded');
+    } catch (e){
+      console.error(e);
+      st.innerHTML = `<span class="err">Impossible de lire ce fichier : ${esc(e.message || e)}</span>`;
+      if (kind === 'tracker') state.tracker = []; if (kind === 'shopify') state.shopify = null;
+    }
+    updateRun();
+    if (state.result) run();
+  }
+  function updateRun(){
+    const ready = state.tracker.length && state.ubs.length;
+    $('#run').disabled = !ready;
+    $('#runHint').textContent = ready ? (state.shopify ? 'Tout est prêt.' : 'Prêt — sans Shopify, les commandes et dégustations seront moins bien rapprochées.') : 'Charge au moins le tracker et les relevés UBS. Shopify est recommandé.';
+  }
+  $('#run').onclick = run;
+
+  // ---------- contrôle ----------
+  function run(){
+    const t = parseTracker(state.tracker);
+    const m = mergeUbs();
+    const orders = state.shopify ? state.shopify.orders : [];
+    state.result = reconcile({ invoices: t.invoices, degust: t.degust, orders, ubs: m, config });
+    state.result.ubsMeta = m;
+    state.knownNames = [...new Set([...t.invoices.map(x => x.client), ...t.degust.map(d => d.client), ...orders.map(o => o.customer), ...m.transactions.filter(x => x.amount > 0).map(x => x.counterparty)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    $('#knownNames').innerHTML = state.knownNames.map(n => `<option value="${esc(n)}">`).join('');
+    state.selected.clear();
+    $('#results').hidden = false;
+    render();
+    $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- onglets ----------
+  const TABS = [
+    { id: 'relancer', label: 'À relancer', note: 'Aucun paiement trouvé après le délai. La date « approx. » vient du libellé de la facture ou de la commande Shopify.' },
+    { id: 'verifier', label: 'À vérifier', note: 'Cas ambigus : écart de montant, PayPal, doublon possible, ligne incomplète, statut Shopify à corriger…' },
+    { id: 'fermer', label: 'À fermer', note: 'Factures encore « Opened » dans le tracker alors que le virement est arrivé.' },
+    { id: 'clients', label: 'Clients par virement', note: 'Clients qui paient par virement : commandes Shopify sans virement correspondant (plus anciennes que le délai). Indicatif — certaines ont pu être payées par TWINT ou carte.' },
+    { id: 'nonid', label: 'Virements non identifiés', note: 'Virements reçus qu’aucune facture ni commande n’explique. « Associer » crée un alias, « Ignorer » les retire du contrôle.' },
+    { id: 'degust', label: 'Dégustations', note: 'Bons et dégustations du tracker, rapprochés avec Shopify (email, nom, montant) puis UBS.' },
+    { id: 'factures', label: 'Toutes les factures', note: 'Toutes les factures du tracker avec leur statut calculé.' },
+  ];
+  function tabRows(id){
+    const R = state.result;
+    if (id === 'relancer') return R.rows.filter(r => r.statut === 'relancer').sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
+    if (id === 'verifier') return R.rows.filter(r => r.statut === 'verifier');
+    if (id === 'fermer') return R.rows.filter(r => r.statut === 'fermer');
+    if (id === 'clients') return R.ledger.filter(l => l.sansVirement.length);
+    if (id === 'nonid') return R.unidentified;
+    if (id === 'degust') return R.rows.filter(r => r.type === 'Dégustation');
+    if (id === 'factures') return R.rows.filter(r => r.type === 'Facture');
+    return [];
+  }
+
+  function render(){
+    const R = state.result;
+    const m = R.ubsMeta;
+    $('#asof').innerHTML = `Situation au <b>${fmtDate(R.asOf)}</b> (dernier mouvement UBS) · relevés du ${fmtDate(m.from)} au ${fmtDate(m.to)}` +
+      (m.chainOk ? '' : ' · <span style="color:var(--verifier)">soldes non continus : un relevé manque peut-être</span>');
+    const sum = (rows) => rows.reduce((a, r) => a + (r.montant || 0), 0);
+    const rel = tabRows('relancer'), ver = tabRows('verifier'), fer = tabRows('fermer'), cli = tabRows('clients'), non = tabRows('nonid');
+    $('#kpis').innerHTML = [
+      ['relancer', rel.length, 'à relancer', `CHF ${chf(sum(rel))}`],
+      ['verifier', ver.length, 'à vérifier', ''],
+      ['fermer', fer.length, 'payées, à fermer', `CHF ${chf(sum(fer))}`],
+      ['clients', cli.reduce((a, l) => a + l.sansVirement.length, 0), 'commandes sans virement', `CHF ${chf(cli.reduce((a, l) => a + l.montantSansVirement, 0))}`],
+      ['nonid', non.length, 'virements non identifiés', `CHF ${chf(sum(non))}`],
+    ].map(([id, n, l, s]) => `<button class="kpi ${id}" data-tab="${id}"><div class="n">${n}</div><div class="l">${l}</div>${s ? `<div class="s">${s}</div>` : ''}</button>`).join('');
+    $$('.kpi').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
+    $('#tabs').innerHTML = TABS.map(t => `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${t.id === state.tab}">${t.label}<span class="c">${tabRows(t.id).length}</span></button>`).join('');
+    $$('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
+    $('#tabnote').textContent = TABS.find(t => t.id === state.tab).note;
+    $('#copySel').hidden = state.tab !== 'relancer';
+    renderTable();
+  }
+
+  const pill = (st) => `<span class="pill ${st}">${LABEL[st] || st}</span>`;
+  const dateCell = (r) => r.date ? `${fmtDate(r.date)}${r.dateApprox ? '<span class="sub">approx.</span>' : ''}` : '<span class="sub">inconnue</span>';
+  const flags = (r) => (r.flags || []).map(f => `<span class="flag">⚑ ${esc(f)}</span>`).join('<br>');
+  const ref = (r) => r.type === 'Facture' ? `${esc(r.ref)}` : r.type === 'Commande Shopify' ? `Shopify ${esc(r.ref)}` : `<span class="sub" style="margin:0">${esc(r.ref)}</span>`;
+
+  function columns(id){
+    if (id === 'relancer') return [
+      { h: '', w: r => `<input type="checkbox" class="sel" data-k="${esc(rowKey(r))}" ${state.selected.has(rowKey(r)) ? 'checked' : ''}>` },
+      { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
+      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: 'Jours', c: 'num', w: r => r.age ?? '', t: r => r.age }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+      { h: 'Email', w: r => r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : '<span class="sub">—</span>', t: r => r.email },
+      { h: 'Pourquoi', w: r => esc(r.raison) + (r.note ? `<span class="sub">Note : ${esc(r.note)}</span>` : ''), t: r => r.raison },
+    ];
+    if (id === 'verifier') return [
+      { h: 'Type', w: r => esc(r.type), t: r => r.type }, { h: 'Réf.', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
+      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: 'Pourquoi', w: r => `<b>${esc(r.raison)}</b>` + (r.note ? `<span class="sub">${esc(r.note)}</span>` : ''), t: r => r.raison },
+      { h: 'Paiement trouvé', w: r => esc(r.paiement) || '<span class="sub">—</span>', t: r => r.paiement },
+      { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+    ];
+    if (id === 'fermer') return [
+      { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client), t: r => r.client },
+      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date facture', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: 'Virement reçu', w: r => esc(r.paiement), t: r => r.paiement }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+    ];
+    if (id === 'clients') return [
+      { h: 'Payeur (UBS)', w: l => esc(l.payeur), t: l => l.payeur }, { h: 'Client(s) Shopify', w: l => esc(l.clientsShopify.join(', ')), t: l => l.clientsShopify.join(', ') },
+      { h: 'Virements reçus', c: 'num', w: l => `${chf(l.recu)}<span class="sub">${l.nbVirements} virement(s)</span>`, t: l => l.recu },
+      { h: 'Commandé', c: 'num', w: l => `${chf(l.commande)}<span class="sub">${l.commandes} commande(s)</span>`, t: l => l.commande },
+      { h: 'Sans virement', c: 'num', w: l => `<b>${chf(l.montantSansVirement)}</b><span class="sub">${l.sansVirement.length} commande(s)</span>`, t: l => l.montantSansVirement },
+      { h: 'Détail', w: l => `<details><summary>voir</summary><ul>${l.sansVirement.map(o => `<li>${esc(o.name)} · ${fmtDate(o.date)} · CHF ${chf(o.amount)}</li>`).join('')}</ul></details>`, t: l => l.sansVirement.map(o => `${o.name} ${fmtDate(o.date)} ${o.amount}`).join(' | ') },
+      { h: 'Dernier virement', c: 'nowrap', w: l => fmtDate(l.dernier), t: l => fmtDate(l.dernier) },
+    ];
+    if (id === 'nonid') return [
+      { h: 'Date', c: 'nowrap', w: u => fmtDate(u.date), t: u => fmtDate(u.date) }, { h: 'Émetteur', w: u => esc(u.de), t: u => u.de },
+      { h: 'Montant', c: 'num', w: u => chf(u.montant), t: u => u.montant }, { h: 'Libellé', w: u => esc(u.libelle), t: u => u.libelle },
+      { h: '', w: u => `<button class="linkbtn assocBtn" data-name="${esc(u.de)}">Associer à un client</button> · <button class="linkbtn ignoreBtn" data-name="${esc(u.de)}">Ignorer</button>` },
+    ];
+    if (id === 'degust') return [
+      { h: 'Statut', w: r => pill(r.statut), t: r => LABEL[r.statut] }, { h: 'Client', w: r => esc(r.client), t: r => r.client },
+      { h: 'Détails', w: r => `<span class="sub" style="margin:0">${esc(r.ref)}</span>`, t: r => r.ref }, { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant },
+      { h: 'Date', c: 'nowrap', w: r => fmtDate(r.date), t: r => fmtDate(r.date) }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+      { h: 'Pourquoi', w: r => esc(r.raison) + (r.note ? `<span class="sub">${esc(r.note)}</span>` : ''), t: r => r.raison },
+    ];
+    return [
+      { h: 'Statut', w: r => pill(r.statut), t: r => LABEL[r.statut] }, { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
+      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) }, { h: 'Tracker', w: r => esc(r.tracker), t: r => r.tracker },
+      { h: 'Paiement', w: r => esc(r.paiement) || '<span class="sub">—</span>', t: r => r.paiement }, { h: 'Pourquoi', w: r => esc(r.raison), t: r => r.raison },
+    ];
+  }
+  const rowKey = (r) => [r.type, r.ref, r.client, r.montant, r.date].join('|');
+
+  function filtered(){
+    const q = deaccent($('#filter').value.trim().toLowerCase());
+    const cols = columns(state.tab);
+    const rows = tabRows(state.tab);
+    if (!q) return rows;
+    return rows.filter(r => cols.some(c => c.t && deaccent(String(c.t(r) ?? '').toLowerCase()).includes(q)));
+  }
+  function renderTable(){
+    const cols = columns(state.tab), rows = filtered();
+    if (!rows.length){ $('#table').innerHTML = `<div class="empty">${$('#filter').value ? 'Aucun résultat pour ce filtre.' : 'Rien ici. 👌'}</div>`; return; }
+    $('#table').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.c || ''}">${c.h}</th>`).join('')}</tr></thead><tbody>` +
+      rows.map(r => `<tr>${cols.map(c => `<td class="${c.c || ''}">${c.w(r)}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+    $$('.sel').forEach(cb => cb.onchange = () => { cb.checked ? state.selected.add(cb.dataset.k) : state.selected.delete(cb.dataset.k); });
+    $$('.ignoreBtn').forEach(b => b.onclick = () => { if (!config.ignorer.includes(b.dataset.name)) config.ignorer.push(b.dataset.name); saveConfig(); run(); });
+    $$('.assocBtn').forEach(b => b.onclick = () => {
+      const td = b.parentElement; if ($('.assoc', td)) return;
+      td.insertAdjacentHTML('beforeend', `<div class="assoc"><input list="knownNames" placeholder="Client (tracker ou Shopify)"><button class="btn ghost small">OK</button></div>`);
+      const inp = $('.assoc input', td); inp.focus();
+      $('.assoc button', td).onclick = () => { const v = inp.value.trim(); if (!v) return; config.alias.push({ de: v, vers: b.dataset.name }); saveConfig(); run(); };
+    });
+  }
+  $('#filter').addEventListener('input', renderTable);
+
+  // ---------- export ----------
+  function download(name, text, type){
+    const blob = new Blob([text], { type }); const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  const csvCell = (v) => { const s = v === null || v === undefined ? '' : typeof v === 'number' ? String(v).replace('.', ',') : String(v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const toCsv = (hdr, rows) => '﻿' + [hdr, ...rows].map(r => r.map(csvCell).join(';')).join('\r\n');
+  $('#exportTab').onclick = () => {
+    const cols = columns(state.tab).filter(c => c.t);
+    download(`paiements-${state.tab}-${state.result.asOf}.csv`, toCsv(cols.map(c => c.h), filtered().map(r => cols.map(c => c.t(r)))), 'text/csv');
+  };
+  $('#exportAll').onclick = () => {
+    const R = state.result;
+    const hdr = ['Statut', 'Type', 'Réf.', 'Client', 'Montant', 'Date', 'Date approx.', 'Jours', 'Pourquoi', 'Paiement trouvé', 'Shopify', 'Email', 'Tracker', 'Note'];
+    const rows = R.rows.map(r => [LABEL[r.statut], r.type, r.ref, r.client, r.montant, fmtDate(r.date), r.dateApprox ? 'oui' : '', r.age, r.raison, r.paiement, r.shopify, r.email, r.tracker, [r.note, ...(r.flags || [])].filter(Boolean).join(' · ')]);
+    for (const u of R.unidentified) rows.push(['Non identifié', 'Virement UBS', '', u.de, u.montant, fmtDate(u.date), '', '', 'Virement sans facture ni commande correspondante', '', '', '', '', u.libelle]);
+    download(`controle-paiements-${R.asOf}.csv`, toCsv(hdr, rows), 'text/csv');
+  };
+  $('#copySel').onclick = async () => {
+    const rows = tabRows('relancer').filter(r => state.selected.has(rowKey(r)));
+    const list = (rows.length ? rows : tabRows('relancer')).map(r => `- ${r.client} — ${r.type === 'Facture' ? 'facture ' + r.ref : r.type + ' ' + r.ref} — CHF ${chf(r.montant)} — ${r.date ? fmtDate(r.date) : 'date inconnue'}${r.email ? ' — ' + r.email : ''}`).join('\n');
+    try { await navigator.clipboard.writeText(list); $('#copySel').textContent = `Copié (${rows.length || tabRows('relancer').length})`; }
+    catch (e){ prompt('Copie ce texte :', list); }
+    setTimeout(() => { $('#copySel').textContent = 'Copier la sélection pour les relances'; }, 2000);
+  };
+
+  // ---------- fenêtre paramètres ----------
+  function renderSettings(){
+    $('#aliasList').innerHTML = config.alias.length ? config.alias.map((a, i) => `<div class="item"><span>${esc(a.de)} <b>=</b> ${esc(a.vers)}</span><button type="button" class="x" data-i="${i}" title="Supprimer">×</button></div>`).join('') : '<p class="muted">Aucun alias.</p>';
+    $('#ignoreList').innerHTML = config.ignorer.length ? config.ignorer.map((n, i) => `<div class="item"><span>${esc(n)}</span><button type="button" class="x" data-j="${i}" title="Supprimer">×</button></div>`).join('') : '<p class="muted">Aucun.</p>';
+    $('#delai').value = config.delaiRelance;
+    $$('#aliasList .x').forEach(b => b.onclick = () => { config.alias.splice(+b.dataset.i, 1); saveConfig(); renderSettings(); });
+    $$('#ignoreList .x').forEach(b => b.onclick = () => { config.ignorer.splice(+b.dataset.j, 1); saveConfig(); renderSettings(); });
+  }
+  $('#openSettings').onclick = () => { renderSettings(); $('#settings').showModal(); };
+  $('#settings').addEventListener('close', () => { if (state.result) run(); });
+  $('#aliasAdd').onclick = () => { const de = $('#aliasDe').value.trim(), vers = $('#aliasVers').value.trim(); if (!de || !vers) return; config.alias.push({ de, vers }); $('#aliasDe').value = $('#aliasVers').value = ''; saveConfig(); renderSettings(); };
+  $('#ignoreAdd').onclick = () => { const n = $('#ignoreName').value.trim(); if (!n) return; config.ignorer.push(n); $('#ignoreName').value = ''; saveConfig(); renderSettings(); };
+  $('#delai').onchange = () => { const v = parseInt($('#delai').value, 10); if (v >= 0) { config.delaiRelance = v; saveConfig(); } };
+  $('#exportCfg').onclick = () => download('parametres-controle-paiements.json', JSON.stringify(config, null, 2), 'application/json');
+  $('#importCfg').onchange = async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const c = JSON.parse(await f.text()); config = { ...DEFAULT_CFG, ...c, alias: c.alias || [], ignorer: c.ignorer || [] }; saveConfig(); renderSettings(); }
+    catch (err){ alert('Fichier de paramètres illisible.'); }
+    e.target.value = '';
+  };
+})();
+
+</script>
+</body>
+</html>

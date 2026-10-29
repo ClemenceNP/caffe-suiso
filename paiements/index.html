@@ -170,6 +170,7 @@ tr.row-alerte td{background:var(--relancer-bg)}
 .months{width:100%;margin-top:6px;font-size:12.5px}
 .months td,.months th{padding:4px 8px;white-space:nowrap}
 @media (max-width:900px){ .files.two{grid-template-columns:1fr} }
+.settings.over{outline:2px dashed var(--accent);outline-offset:-8px}
 
 </style>
 </head>
@@ -295,7 +296,7 @@ tr.row-alerte td{background:var(--relancer-bg)}
     <label class="inline"><input type="date" id="debut" class="date"> <span data-i18n="s_start_d"></span></label>
 
     <div class="settings-foot">
-      <label class="btn ghost small"><span data-i18n="s_import"></span><input type="file" id="importCfg" accept=".json" hidden></label>
+      <label class="btn ghost small"><span data-i18n="s_import"></span><input type="file" id="importCfg" hidden></label>
       <button type="button" class="btn ghost small" id="exportCfg" data-i18n="s_export"></button>
       <span class="spacer"></span>
       <button class="btn primary" value="close" data-i18n="close"></button>
@@ -1628,11 +1629,17 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   $('#delai').onchange = () => { const v = parseInt($('#delai').value, 10); if (v >= 0){ config.delaiRelance = v; saveConfig(); } };
   $('#debut').onchange = () => { config.debutControle = $('#debut').value || ''; saveConfig(); };
   $('#exportCfg').onclick = () => download('parametres-controle-paiements.json', JSON.stringify(config, null, 2), 'application/json');
-  $('#importCfg').onchange = async (e) => {
-    const f = e.target.files[0]; if (!f) return;
-    try { config = normCfg(JSON.parse(await f.text())); saveConfig(); renderSettings(); } catch (err){ alert(t('s_bad')); }
-    e.target.value = '';
+  const importCfgFile = async (f) => {
+    if (!f) return;
+    try { const c = JSON.parse(await f.text()); if (!c || typeof c !== 'object' || (!c.alias && !c.ignorer && !c.tagsHorsUbs)) throw new Error('format'); config = normCfg(c); saveConfig(); renderSettings(); }
+    catch (err){ alert(t('s_bad')); }
   };
+  $('#importCfg').onchange = async (e) => { await importCfgFile(e.target.files[0]); e.target.value = ''; };
+  // glisser-déposer le fichier de paramètres directement sur la fenêtre
+  const sf = $('#settings form');
+  sf.addEventListener('dragover', e => { e.preventDefault(); sf.classList.add('over'); });
+  sf.addEventListener('dragleave', () => sf.classList.remove('over'));
+  sf.addEventListener('drop', e => { e.preventDefault(); sf.classList.remove('over'); importCfgFile(e.dataTransfer.files[0]); });
 
   applyStatic(); renderStatuses(); updateRun();
 })();

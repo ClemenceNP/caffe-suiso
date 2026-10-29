@@ -395,7 +395,7 @@ function parseDateCell(v){
   return null;
 }
 
-// Déduit un mois approximatif depuis un libellé ("Gottardo June 25", "SaporiBio - 05.26", "Bally Q1 2024")
+// Déduit un mois approximatif depuis un libellé ("Rossi June 25", "Bianchi - 05.26", "Verdi Q1 2024")
 function dateFromLabel(label){
   const s = deaccent(String(label||'').toLowerCase());
   let m = s.match(/\b(\d{1,2})[./](\d{2,4})\b/);
@@ -834,10 +834,14 @@ function reconcile({ invoices, degust, orders, ubs, config }){
                 shopify: shopTxt(x.order), email: (x.order && x.order.email) || emailFor(invNames(x)), tracker: x.section === 'closed' ? 'Closed' : 'Opened', note: x.note, pays: pays(x.payments), flags: [] };
     const paid = x.payments.length > 0, ecart = x.payments.some(p => p.ecart);
     const notePaypal = /paypal/i.test(x.note + ' ' + x.sent), noteCleme = /cleme|clémence/i.test(x.note);
+    // paiement hors UBS indiqué dans la note du tracker (TWINT, carte, espèces…)
+    const otherM = (x.note || '').match(/twint|carte|card|carta|stripe|cash|contanti|esp[eè]ces|liquide/i);
+    const other = otherM ? otherM[0] : null;
     if (x.section === 'closed'){
       if (paid) set(r, ecart ? 'verifier' : 'ok', ecart ? 'paid_ecart' : 'paid');
       else if (notePaypal) set(r, 'info', 'paypal_closed');
       else if (noteCleme) set(r, 'info', 'cleme_closed');
+      else if (other) set(r, 'info', 'other_closed', { how: other });
       else if (x.date && ubsStart && x.date < addDays(ubsStart, -45)) set(r, 'info', 'before_ubs');
       else set(r, 'info', 'closed_no_trace');
     } else {
@@ -848,6 +852,8 @@ function reconcile({ invoices, degust, orders, ubs, config }){
       else if (x.amount === null) set(r, 'verifier', 'missing_amount');
       else if (notePaypal) set(r, 'verifier', 'paypal_open');
       else if (noteCleme) set(r, 'verifier', 'cleme_open');
+      else if (other && isYes(x.paidMark)) set(r, 'fermer', 'other_paid', { how: other });
+      else if (other) set(r, 'verifier', 'other_open', { how: other });
       else if (twin) set(r, 'verifier', 'twin', { a: x.amount, other: twin.id || twin.client });
       else if (isYes(x.paidMark)) set(r, 'verifier', 'marked_paid');
       else if (!x.id && x.order && x.order.status === 'paid') set(r, 'verifier', 'noid_shopify_paid');
@@ -957,13 +963,14 @@ function reconcile({ invoices, degust, orders, ubs, config }){
       pay_group: ' (virement groupé ×{n})', pay_diff: ' · écart {d}', trk: 'tracker : {v}', linked_f: 'liée à la facture {r}', linked_d: 'liée à la dégustation {r}',
       cp_inv: 'facture {r}', cp_nodate: 'date inconnue', copy_prompt: 'Copie ce texte :', nonid_why: 'Virement sans facture ni commande correspondante',
       s_intro: 'Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.',
-      s_alias: 'Alias (même client, noms différents)', s_alias_ex: 'Ex. « Malcanton » dans le tracker = « Green Web Solutions » sur UBS.',
+      s_alias: 'Alias (même client, noms différents)', s_alias_ex: 'Ex. « Rossi » dans le tracker = « Studio Rossi SA » sur UBS.',
       s_de: 'Nom dans le tracker / Shopify', s_vers: 'Nom sur le relevé UBS', add: 'Ajouter', s_noalias: 'Aucun alias.',
       s_ignore: 'Virements à ignorer', s_ignore_d: 'Virements internes, remboursements, apports… (le titulaire du compte est ignoré automatiquement).',
       s_ignore_ph: "Nom de l'émetteur sur UBS", s_none: 'Aucun.', s_delay: 'Délai avant relance', s_delay_d: 'jours après la date de la facture',
       s_import: 'Importer (.json)', s_export: 'Exporter (.json)', close: 'Fermer', del: 'Supprimer', s_bad: 'Fichier de paramètres illisible.',
       r: {
         paid: 'Payée', paid_ecart: 'Payée avec un écart de montant', paypal_closed: 'Payée via PayPal (hors UBS)', cleme_closed: 'Payée sur le compte de Clémence',
+        other_closed: 'Payée hors UBS ({how}, selon le tracker)', other_paid: 'Payée hors UBS ({how}, selon le tracker) — à passer en Closed', other_open: 'Paiement {how} annoncé — à confirmer puis cocher « Pagata »',
         before_ubs: 'Antérieure aux relevés UBS chargés', closed_no_trace: 'Fermée, aucun virement UBS trouvé (TWINT, carte ou espèces ?)',
         to_close: 'Virement reçu — à passer en Closed', to_close_ecart: 'Virement reçu avec un écart de montant — à vérifier puis fermer',
         missing_amount: 'Montant manquant dans le tracker', paypal_open: 'Paiement PayPal annoncé — à contrôler dans PayPal', cleme_open: 'Paiement annoncé sur le compte de Clémence',
@@ -1015,13 +1022,14 @@ function reconcile({ invoices, degust, orders, ubs, config }){
       pay_group: ' (bonifico cumulativo ×{n})', pay_diff: ' · differenza {d}', trk: 'tracker: {v}', linked_f: 'collegato alla fattura {r}', linked_d: 'collegato alla degustazione {r}',
       cp_inv: 'fattura {r}', cp_nodate: 'data sconosciuta', copy_prompt: 'Copia questo testo:', nonid_why: 'Bonifico senza fattura né ordine corrispondente',
       s_intro: 'Salvate in questo browser. Esportale per conservarle o usarle su un altro computer.',
-      s_alias: 'Alias (stesso cliente, nomi diversi)', s_alias_ex: 'Es. «Malcanton» nel tracker = «Green Web Solutions» su UBS.',
+      s_alias: 'Alias (stesso cliente, nomi diversi)', s_alias_ex: 'Es. «Rossi» nel tracker = «Studio Rossi SA» su UBS.',
       s_de: 'Nome nel tracker / Shopify', s_vers: 'Nome sull’estratto UBS', add: 'Aggiungi', s_noalias: 'Nessun alias.',
       s_ignore: 'Bonifici da ignorare', s_ignore_d: 'Bonifici interni, rimborsi, apporti… (il titolare del conto viene ignorato automaticamente).',
       s_ignore_ph: 'Nome dell’ordinante su UBS', s_none: 'Nessuno.', s_delay: 'Termine prima del sollecito', s_delay_d: 'giorni dopo la data della fattura',
       s_import: 'Importa (.json)', s_export: 'Esporta (.json)', close: 'Chiudi', del: 'Elimina', s_bad: 'File di impostazioni illeggibile.',
       r: {
         paid: 'Pagata', paid_ecart: 'Pagata con una differenza d’importo', paypal_closed: 'Pagata con PayPal (fuori UBS)', cleme_closed: 'Pagata sul conto di Clémence',
+        other_closed: 'Pagata fuori UBS ({how}, secondo il tracker)', other_paid: 'Pagata fuori UBS ({how}, secondo il tracker) — da passare in Closed', other_open: 'Pagamento {how} annunciato — da confermare e poi segnare «Pagata»',
         before_ubs: 'Precedente agli estratti UBS caricati', closed_no_trace: 'Chiusa, nessun bonifico UBS trovato (TWINT, carta o contanti?)',
         to_close: 'Bonifico ricevuto — da passare in Closed', to_close_ecart: 'Bonifico ricevuto con una differenza d’importo — verificare e poi chiudere',
         missing_amount: 'Importo mancante nel tracker', paypal_open: 'Pagamento PayPal annunciato — da controllare su PayPal', cleme_open: 'Pagamento annunciato sul conto di Clémence',
@@ -1073,13 +1081,14 @@ function reconcile({ invoices, degust, orders, ubs, config }){
       pay_group: ' (combined transfer ×{n})', pay_diff: ' · difference {d}', trk: 'tracker: {v}', linked_f: 'linked to invoice {r}', linked_d: 'linked to tasting {r}',
       cp_inv: 'invoice {r}', cp_nodate: 'unknown date', copy_prompt: 'Copy this text:', nonid_why: 'Transfer with no matching invoice or order',
       s_intro: 'Saved in this browser. Export them to keep them or use them on another computer.',
-      s_alias: 'Aliases (same client, different names)', s_alias_ex: 'E.g. "Malcanton" in the tracker = "Green Web Solutions" on UBS.',
+      s_alias: 'Aliases (same client, different names)', s_alias_ex: 'E.g. "Rossi" in the tracker = "Studio Rossi SA" on UBS.',
       s_de: 'Name in tracker / Shopify', s_vers: 'Name on UBS statement', add: 'Add', s_noalias: 'No aliases.',
       s_ignore: 'Transfers to ignore', s_ignore_d: 'Internal transfers, refunds, contributions… (the account holder is ignored automatically).',
       s_ignore_ph: 'Sender name on UBS', s_none: 'None.', s_delay: 'Delay before reminder', s_delay_d: 'days after the invoice date',
       s_import: 'Import (.json)', s_export: 'Export (.json)', close: 'Close', del: 'Delete', s_bad: 'Unreadable settings file.',
       r: {
         paid: 'Paid', paid_ecart: 'Paid with an amount difference', paypal_closed: 'Paid via PayPal (outside UBS)', cleme_closed: "Paid into Clémence's account",
+        other_closed: 'Paid outside UBS ({how}, per the tracker)', other_paid: 'Paid outside UBS ({how}, per the tracker) — mark as Closed', other_open: '{how} payment announced — confirm, then tick "Pagata"',
         before_ubs: 'Older than the UBS statements loaded', closed_no_trace: 'Closed, no UBS transfer found (TWINT, card or cash?)',
         to_close: 'Transfer received — mark as Closed', to_close_ecart: 'Transfer received with an amount difference — check, then close',
         missing_amount: 'Amount missing in the tracker', paypal_open: 'PayPal payment announced — check in PayPal', cleme_open: "Payment announced into Clémence's account",

@@ -704,8 +704,17 @@ function classifyUbs(tx, ignoreIdx, ignoreNames){
   if (/paypal/i.test(cp)) return 'paypal';
   if (/schaltereinzahlung|versamento in contanti|dépôt|depot espèces/i.test(cp)) return 'especes';
   if (!cp || /^regolamenti diversi$/i.test(cp)) return 'anonyme';
-  for (const n of ignoreNames) if (ignoreIdx.score(cp, n) >= STRONG || deaccent(cp.toLowerCase()).includes(deaccent(n.toLowerCase()))) return 'interne';
+  for (const n of ignoreNames) if (sameFullName(cp, n) || deaccent(cp.toLowerCase()).includes(deaccent(n.toLowerCase()))) return 'interne';
   return 'client';
+}
+// Même personne ? Tous les mots du nom le plus court doivent se retrouver dans l'autre (≥ 2 mots, sauf nom d'un seul mot).
+// Évite qu'un parent du titulaire (même nom de famille) soit pris pour un virement interne.
+function sameFullName(a, b){
+  const A = nameTokens(a), B = nameTokens(b);
+  if (!A.length || !B.length) return false;
+  const [s, l] = A.length <= B.length ? [A, B] : [B, A];
+  const hit = (x) => l.some(y => y === x || tokenSim(x, y) >= 0.6);
+  return s.every(hit) && (s.length >= 2 || B.length === 1);
 }
 
 // ---------- rapprochement ----------
@@ -995,7 +1004,10 @@ const PROC_FAMILY = (gw) => {
   if (/sumup|postfinance|datatrans|klarna|adyen|mollie|wallee|payrexx|saferpay|worldline/.test(g)) return 'autre';
   return null;   // « manual », virement, cash on delivery, méthode manuelle personnalisée…
 };
-const DEFAULT_TAGS = ['cash', 'contanti', 'especes', 'espèces', 'cleme', 'famille', 'famiglia', 'family', 'offert', 'regalo', 'gratuit', 'twint', 'paye', 'payé', 'pagato', 'paid'];
+const DEFAULT_TAGS = ['cash', 'twint', 'family', 'france', 'paid'];
+// ancienne liste par défaut : si elle est encore telle quelle dans les paramètres, on la remplace par la nouvelle
+const OLD_DEFAULT_TAGS = ['cash', 'contanti', 'especes', 'espèces', 'cleme', 'famille', 'famiglia', 'family', 'offert', 'regalo', 'gratuit', 'twint', 'paye', 'payé', 'pagato', 'paid'];
+const isOldDefaultTags = (l) => Array.isArray(l) && l.length === OLD_DEFAULT_TAGS.length && OLD_DEFAULT_TAGS.every(t => l.includes(t));
 
 const nk = (k) => deaccent(String(k || '').toLowerCase()).replace(/[^a-z0-9]/g, '');
 function pickKey(keys, ...cands){ const m = new Map(keys.map(k => [nk(k), k])); for (const c of cands){ const k = m.get(nk(c)); if (k) return k; } return null; }
@@ -1094,8 +1106,10 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   for (const c of credits) idx.addName(c.counterparty);
 
   // ---------- rapprochement virement ↔ commande(s) (premier arrivé, premier servi) ----------
-  const open = items.filter(it => !it.offTag);
-  for (const c of credits){
+  // 1er passage : commandes sans tag. 2e passage : commandes taguées, sur les virements restants.
+  // Un tag dit « pas de relance si rien n'arrive », mais si un virement correspond, il est relié quand même.
+  const matchPass = (open) => { for (const c of credits){
+    if (c.usedBy.length) continue;
     const cands = open.filter(it => !it.payments.length && it.o.date && c.date >= (it.o.orderDate ? addDays(it.o.orderDate, -10) : addDays(it.o.payDate, -60)) && daysBetween(it.o.date, c.date) <= 240)
                       .map(it => ({ it, s: idx.score(it.o.match || it.o.customer, c.counterparty) })).filter(e => e.s >= WEAK);
     if (!cands.length) continue;
@@ -1105,7 +1119,9 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     if (!pick) pick = bestCombo(cands.filter(e => e.s >= STRONG).sort(byAge).map(e => e.it), c.amount, it => it.amount, 3);
     if (!pick){ const tol = cands.filter(e => e.s >= STRONG && e.it.amount >= 20 && Math.abs(e.it.amount - c.amount) <= Math.max(1, e.it.amount * 0.12) && Math.abs(daysBetween(e.it.o.date, c.date)) <= 90).sort(byAge); if (tol.length){ pick = [tol[0].it]; ecart = true; } }
     if (pick) for (const it of pick){ it.payments.push({ date: c.date, from: c.counterparty, amount: c.amount, groupe: pick.length > 1 ? pick.length : 0, ecart: ecart ? round2(c.amount - it.amount) : 0 }); c.usedBy.push(it.o.name); }
-  }
+  } };
+  matchPass(items.filter(it => !it.offTag));
+  matchPass(items.filter(it => it.offTag));
 
   // ---------- statuts ----------
   const age = (d) => d && asOf ? daysBetween(d, asOf) : null;
@@ -1116,7 +1132,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     const set = (statut, rk, rp) => { r.statut = statut; r.rk = rk; r.rp = rp || {}; };
     const paid = it.payments.length > 0, ecart = it.payments.some(p => p.ecart);
     const debut = config.debutControle || null;
-    if (it.offTag) set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
+    if (it.offTag && !paid) set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
     else if (!paid && debut && o.date && o.date < debut) set('info', 'before_start', { dt: debut });
     else if (paid && it.kind === 'pending') set('verifier', 'pending_but_paid');
     else if (paid && ecart && it.payments.some(p => Math.abs(p.ecart) > Math.max(1, it.amount * 0.02))) set('verifier', 'paid_ecart', { e: it.payments[0].ecart });
@@ -1126,6 +1142,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     else if (r.age !== null && r.age < delai) set('attente', it.kind === 'pending' ? 'pending_in_delay' : 'in_delay', { d: r.age });
     else set('relancer', it.kind === 'pending' ? 'pending_unpaid' : 'manual_unpaid', { d: r.age });
     if (it.kind === 'manual' && o.status && /pending|partially/.test(o.status)) r.flags.push({ k: 'f_partial' });
+    if (it.offTag && paid) r.flags.push({ k: 'f_tag_ignored', p: { t: it.offTag } });
     return r;
   }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
@@ -1185,7 +1202,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       howto_t: 'Comment créer les deux rapports dans Shopify (une seule fois)',
       howto_intro: 'Dans Shopify : <b>Analytique → Rapports → Nouvelle exploration</b>. Remplace la requête par celle ci-dessous, puis <b>Enregistrer sous…</b> Ensuite, chaque mois : ouvre le rapport → <b>Exporter</b> → CSV.',
       q1_t: 'Rapport 1 — Paiements (obligatoire)', q2_t: 'Rapport 2 — Commandes (recommandé : dates exactes et commandes non payées)', copy: 'Copier', copiedq: 'Copié ✓',
-      howto_tags: 'Commande manuelle <b>pas</b> payée par virement ? Ajoute un tag dans Shopify : <code>cash</code>, <code>cleme</code>, <code>famille</code>, <code>twint</code>… ou <code>payé</code> si tu as vérifié toi-même. La liste est modifiable dans Paramètres.',
+      howto_tags: 'Commande manuelle <b>pas</b> payée par virement ? Ajoute un tag dans Shopify : <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… ou <code>paid</code> si tu as vérifié toi-même. Si un virement correspondant arrive quand même, il est relié à la commande et le tag est ignoré. La liste est modifiable dans Paramètres.',
       nofile: 'Aucun fichier', reading: 'Lecture…', run: 'Lancer le contrôle', settings: 'Paramètres',
       h_notready: 'Charge les relevés UBS et au moins le rapport Paiements de Shopify.', h_ready: 'Tout est prêt.', h_noorders: 'Prêt — ajoute aussi le rapport Commandes pour les dates exactes et les commandes non payées.',
       st_ubs: '✓ {n} relevé(s) · {m} mouvements', fromto: 'du {a} au {b}', bal_ok: 'soldes vérifiés', bal_ko: 'soldes à contrôler (relevé manquant ?)', clear: 'vider',
@@ -1216,7 +1233,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       s_intro: 'Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.',
       s_alias: 'Alias (même client, noms différents)', s_alias_ex: 'Ex. « Rossi » dans Shopify = « Studio Rossi SA » sur UBS.',
       s_de: 'Nom dans Shopify', s_vers: 'Nom sur le relevé UBS', add: 'Ajouter', s_noalias: 'Aucun alias.',
-      s_tags: 'Tags « hors virement »', s_tags_d: 'Une commande manuelle avec l’un de ces tags Shopify n’est pas cherchée sur UBS (cash, compte de Clémence, famille… ou « payé » si vérifié à la main).', s_tags_ph: 'Nouveau tag',
+      s_tags: 'Tags « pas de relance »', s_tags_d: 'Une commande manuelle avec l’un de ces tags Shopify n’est jamais à relancer. Si un virement correspondant est trouvé sur UBS, il est quand même relié à la commande (le tag est alors ignoré).', s_tags_ph: 'Nouveau tag',
       s_ignore: 'Virements à ignorer', s_ignore_d: 'Virements internes, remboursements, apports… (le titulaire du compte est ignoré automatiquement).',
       s_ignore_ph: "Nom de l'émetteur sur UBS", s_none: 'Aucun.', s_delay: 'Délai avant relance', s_delay_d: 'jours après la date de la commande',
       s_start: 'Début du contrôle', s_start_d: 'les commandes plus anciennes sont ignorées (laisser vide = tout)',
@@ -1224,10 +1241,10 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       r: {
         paid_transfer: 'Virement reçu', paid_round: 'Virement reçu (petit écart d’arrondi)', paid_ecart: 'Virement reçu avec un écart de {e}',
         pending_but_paid: 'Virement reçu, mais commande encore « en attente » dans Shopify — à marquer payée',
-        off_tag: 'Hors virement (tag « {t} »)', paid_tag: 'Marquée payée à la main (tag « {t} »)', before_start: 'Avant le début du contrôle ({dt})',
+        off_tag: 'Aucun virement, pas de relance (tag « {t} »)', paid_tag: 'Marquée payée à la main (tag « {t} »)', before_start: 'Avant le début du contrôle ({dt})',
         before_ubs: 'Antérieure aux relevés UBS chargés', in_delay: 'Dans le délai ({d} j)', pending_in_delay: 'Non payée, dans le délai ({d} j)',
         manual_unpaid: 'Aucun virement trouvé depuis {d} jours', pending_unpaid: 'Commande non payée depuis {d} jours',
-        f_partial: 'partiellement payée dans Shopify',
+        f_partial: 'partiellement payée dans Shopify', f_tag_ignored: 'virement trouvé : tag « {t} » ignoré',
         no_payout: 'Aucun versement sur UBS depuis le {since} — {a} CHF de ventes en attente', no_payout_never: 'Aucun versement reçu sur UBS — {a} CHF de ventes en attente',
         low_ratio: 'Seulement {r} % des ventes reçues sur UBS', more_received: 'UBS a reçu {a} CHF de plus (ventes encaissées hors Shopify ?)',
         pp_balance: 'L’argent reste sur PayPal jusqu’au retrait — solde estimé {a} CHF', payout_ok: 'Versements réguliers',
@@ -1241,7 +1258,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       howto_t: 'Come creare i due report in Shopify (una sola volta)',
       howto_intro: 'In Shopify: <b>Analisi → Report → Nuova esplorazione</b>. Sostituisci la query con quella qui sotto, poi <b>Salva con nome…</b> Poi, ogni mese: apri il report → <b>Esporta</b> → CSV.',
       q1_t: 'Report 1 — Pagamenti (obbligatorio)', q2_t: 'Report 2 — Ordini (consigliato: date esatte e ordini non pagati)', copy: 'Copia', copiedq: 'Copiato ✓',
-      howto_tags: 'Ordine manuale <b>non</b> pagato con bonifico? Aggiungi un tag in Shopify: <code>cash</code>, <code>cleme</code>, <code>famille</code>, <code>twint</code>… oppure <code>pagato</code> se l’hai verificato tu. L’elenco si modifica nelle Impostazioni.',
+      howto_tags: 'Ordine manuale <b>non</b> pagato con bonifico? Aggiungi un tag in Shopify: <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… oppure <code>paid</code> se l’hai verificato tu. Se arriva comunque un bonifico corrispondente, viene collegato all’ordine e il tag è ignorato. L’elenco si modifica nelle Impostazioni.',
       nofile: 'Nessun file', reading: 'Lettura…', run: 'Avvia il controllo', settings: 'Impostazioni',
       h_notready: 'Carica gli estratti UBS e almeno il report Pagamenti di Shopify.', h_ready: 'Tutto pronto.', h_noorders: 'Pronto — aggiungi anche il report Ordini per date esatte e ordini non pagati.',
       st_ubs: '✓ {n} estratto/i · {m} movimenti', fromto: 'dal {a} al {b}', bal_ok: 'saldi verificati', bal_ko: 'saldi da controllare (manca un estratto?)', clear: 'svuota',
@@ -1272,7 +1289,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       s_intro: 'Salvate in questo browser. Esportale per conservarle o usarle su un altro computer.',
       s_alias: 'Alias (stesso cliente, nomi diversi)', s_alias_ex: 'Es. «Rossi» in Shopify = «Studio Rossi SA» su UBS.',
       s_de: 'Nome in Shopify', s_vers: 'Nome sull’estratto UBS', add: 'Aggiungi', s_noalias: 'Nessun alias.',
-      s_tags: 'Tag «senza bonifico»', s_tags_d: 'Un ordine manuale con uno di questi tag Shopify non viene cercato su UBS (contanti, conto di Clémence, famiglia… oppure «pagato» se verificato a mano).', s_tags_ph: 'Nuovo tag',
+      s_tags: 'Tag «nessun sollecito»', s_tags_d: 'Un ordine manuale con uno di questi tag Shopify non va mai sollecitato. Se su UBS si trova un bonifico corrispondente, viene comunque collegato all’ordine (il tag è allora ignorato).', s_tags_ph: 'Nuovo tag',
       s_ignore: 'Bonifici da ignorare', s_ignore_d: 'Bonifici interni, rimborsi, apporti… (il titolare del conto viene ignorato automaticamente).',
       s_ignore_ph: 'Nome dell’ordinante su UBS', s_none: 'Nessuno.', s_delay: 'Termine prima del sollecito', s_delay_d: 'giorni dopo la data dell’ordine',
       s_start: 'Inizio del controllo', s_start_d: 'gli ordini più vecchi vengono ignorati (vuoto = tutti)',
@@ -1280,10 +1297,10 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       r: {
         paid_transfer: 'Bonifico ricevuto', paid_round: 'Bonifico ricevuto (piccola differenza di arrotondamento)', paid_ecart: 'Bonifico ricevuto con una differenza di {e}',
         pending_but_paid: 'Bonifico ricevuto, ma ordine ancora «in attesa» su Shopify — da segnare come pagato',
-        off_tag: 'Senza bonifico (tag «{t}»)', paid_tag: 'Segnato pagato a mano (tag «{t}»)', before_start: 'Prima dell’inizio del controllo ({dt})',
+        off_tag: 'Nessun bonifico, nessun sollecito (tag «{t}»)', paid_tag: 'Segnato pagato a mano (tag «{t}»)', before_start: 'Prima dell’inizio del controllo ({dt})',
         before_ubs: 'Precedente agli estratti UBS caricati', in_delay: 'Nei termini ({d} giorni)', pending_in_delay: 'Non pagato, nei termini ({d} giorni)',
         manual_unpaid: 'Nessun bonifico trovato da {d} giorni', pending_unpaid: 'Ordine non pagato da {d} giorni',
-        f_partial: 'pagato parzialmente su Shopify',
+        f_partial: 'pagato parzialmente su Shopify', f_tag_ignored: 'bonifico trovato: tag «{t}» ignorato',
         no_payout: 'Nessun versamento su UBS dal {since} — {a} CHF di vendite in attesa', no_payout_never: 'Nessun versamento ricevuto su UBS — {a} CHF di vendite in attesa',
         low_ratio: 'Solo il {r} % delle vendite è arrivato su UBS', more_received: 'UBS ha ricevuto {a} CHF in più (vendite incassate fuori da Shopify?)',
         pp_balance: 'I soldi restano su PayPal fino al prelievo — saldo stimato {a} CHF', payout_ok: 'Versamenti regolari',
@@ -1297,7 +1314,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       howto_t: 'How to create the two reports in Shopify (one time only)',
       howto_intro: 'In Shopify: <b>Analytics → Reports → New exploration</b>. Replace the query with the one below, then <b>Save as…</b> Then, every month: open the report → <b>Export</b> → CSV.',
       q1_t: 'Report 1 — Payments (required)', q2_t: 'Report 2 — Orders (recommended: exact dates and unpaid orders)', copy: 'Copy', copiedq: 'Copied ✓',
-      howto_tags: 'Manual order <b>not</b> paid by bank transfer? Add a tag in Shopify: <code>cash</code>, <code>cleme</code>, <code>famille</code>, <code>twint</code>… or <code>paid</code> if you checked it yourself. The list can be edited in Settings.',
+      howto_tags: 'Manual order <b>not</b> paid by bank transfer? Add a tag in Shopify: <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… or <code>paid</code> if you checked it yourself. If a matching transfer arrives anyway, it is linked to the order and the tag is ignored. The list can be edited in Settings.',
       nofile: 'No file', reading: 'Reading…', run: 'Run the check', settings: 'Settings',
       h_notready: 'Load the UBS statements and at least the Shopify Payments report.', h_ready: 'All set.', h_noorders: 'Ready — also add the Orders report for exact dates and unpaid orders.',
       st_ubs: '✓ {n} statement(s) · {m} transactions', fromto: 'from {a} to {b}', bal_ok: 'balances verified', bal_ko: 'balances to check (missing statement?)', clear: 'clear',
@@ -1328,7 +1345,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       s_intro: 'Saved in this browser. Export them to keep them or use them on another computer.',
       s_alias: 'Aliases (same client, different names)', s_alias_ex: 'E.g. "Rossi" in Shopify = "Studio Rossi SA" on UBS.',
       s_de: 'Name in Shopify', s_vers: 'Name on UBS statement', add: 'Add', s_noalias: 'No aliases.',
-      s_tags: '"No transfer" tags', s_tags_d: 'A manual order with one of these Shopify tags is not searched on UBS (cash, Clémence’s account, family… or "paid" if checked by hand).', s_tags_ph: 'New tag',
+      s_tags: '"No reminder" tags', s_tags_d: 'A manual order with one of these Shopify tags is never put in reminders. If a matching transfer is found on UBS, it is still linked to the order (the tag is then ignored).', s_tags_ph: 'New tag',
       s_ignore: 'Transfers to ignore', s_ignore_d: 'Internal transfers, refunds, contributions… (the account holder is ignored automatically).',
       s_ignore_ph: 'Sender name on UBS', s_none: 'None.', s_delay: 'Delay before reminder', s_delay_d: 'days after the order date',
       s_start: 'Start of the check', s_start_d: 'older orders are ignored (empty = all)',
@@ -1336,10 +1353,10 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       r: {
         paid_transfer: 'Transfer received', paid_round: 'Transfer received (small rounding difference)', paid_ecart: 'Transfer received with a difference of {e}',
         pending_but_paid: 'Transfer received, but order still "pending" in Shopify — mark as paid',
-        off_tag: 'No transfer expected (tag "{t}")', paid_tag: 'Marked paid by hand (tag "{t}")', before_start: 'Before the start of the check ({dt})',
+        off_tag: 'No transfer, no reminder (tag "{t}")', paid_tag: 'Marked paid by hand (tag "{t}")', before_start: 'Before the start of the check ({dt})',
         before_ubs: 'Older than the UBS statements loaded', in_delay: 'Within terms ({d} days)', pending_in_delay: 'Unpaid, within terms ({d} days)',
         manual_unpaid: 'No transfer found for {d} days', pending_unpaid: 'Order unpaid for {d} days',
-        f_partial: 'partially paid in Shopify',
+        f_partial: 'partially paid in Shopify', f_tag_ignored: 'transfer found: tag "{t}" ignored',
         no_payout: 'No payout on UBS since {since} — {a} CHF of sales pending', no_payout_never: 'No payout received on UBS — {a} CHF of sales pending',
         low_ratio: 'Only {r}% of sales received on UBS', more_received: 'UBS received {a} CHF more (sales collected outside Shopify?)',
         pp_balance: 'Money stays on PayPal until withdrawn — estimated balance {a} CHF', payout_ok: 'Regular payouts',
@@ -1380,7 +1397,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   const CFG_KEY = 'caffesuiso-controle-paiements-v1';
   const DEFAULT_CFG = { alias: [], ignorer: [], delaiRelance: 30, tagsHorsUbs: DEFAULT_TAGS.slice(), debutControle: '' };
   let config = loadConfig();
-  function normCfg(c){ return { ...DEFAULT_CFG, ...c, alias: c.alias || [], ignorer: c.ignorer || [], tagsHorsUbs: (c.tagsHorsUbs && c.tagsHorsUbs.length) ? c.tagsHorsUbs : DEFAULT_TAGS.slice() }; }
+  function normCfg(c){ return { ...DEFAULT_CFG, ...c, alias: c.alias || [], ignorer: c.ignorer || [], tagsHorsUbs: (c.tagsHorsUbs && c.tagsHorsUbs.length && !isOldDefaultTags(c.tagsHorsUbs)) ? c.tagsHorsUbs : DEFAULT_TAGS.slice() }; }
   function loadConfig(){ try { const raw = localStorage.getItem(CFG_KEY); if (raw) return normCfg(JSON.parse(raw)); } catch (e) {} return normCfg({}); }
   function saveConfig(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(config)); } catch (e) {} }
 

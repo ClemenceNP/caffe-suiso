@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Contrôle paiements</title>
+<link rel="icon" type="image/png" href="../CS_Logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -48,7 +49,14 @@ h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
 .top .wrap{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
 h1{font-size:28px;margin-top:4px}
-.privacy{margin:0;color:var(--muted);font-size:13px;max-width:360px}
+.brand{display:flex;align-items:center;gap:14px}
+.logo-link{flex:none;display:block;line-height:0}
+.logo{width:56px;height:56px;object-fit:contain}
+.top-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.privacy{margin:0;color:var(--muted);font-size:13px;max-width:360px;text-align:right}
+.lang{display:inline-flex;border:1.5px solid var(--line);border-radius:999px;padding:2px;background:var(--surface)}
+.lang button{font:inherit;font-size:12px;font-weight:600;letter-spacing:.04em;border:0;background:none;color:var(--muted);padding:4px 10px;border-radius:999px;cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 
 .files{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .drop{background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px;transition:border-color .15s,background .15s}
@@ -125,13 +133,15 @@ dialog::backdrop{background:rgba(20,22,30,.45)}
 .kv-add{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .kv-add input,.inline input{font:inherit;font-size:13.5px;padding:7px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);flex:1;min-width:150px}
 .inline{display:flex;align-items:center;gap:8px;font-size:14px}
-.inline input{flex:none;width:80px}
+.inline input{flex:none;width:80px;min-width:0}
 .settings-foot{display:flex;gap:8px;align-items:center;margin-top:18px;flex-wrap:wrap}
 .spacer{flex:1}
 .x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
 
 @media (max-width:900px){
   .files{grid-template-columns:1fr}
+  .top-right{align-items:flex-start}
+  .privacy{text-align:left}
   .kpis{grid-template-columns:repeat(2,1fr)}
   .toolbar input[type=search]{min-width:0;width:100%}
 }
@@ -142,36 +152,44 @@ dialog::backdrop{background:rgba(20,22,30,.45)}
 <header class="top">
   <div class="wrap">
     <div class="brand">
-      <span class="eyebrow">Caffè Suiso · interne</span>
-      <h1>Contrôle des paiements</h1>
+      <a href="../" class="logo-link" aria-label="Caffè Suiso"><img class="logo" src="../CS_Logo.png" alt="Caffè Suiso" width="56" height="56"></a>
+      <div>
+        <span class="eyebrow" data-i18n="eyebrow">Caffè Suiso · interne</span>
+        <h1 data-i18n="title">Contrôle des paiements</h1>
+      </div>
     </div>
-    <p class="privacy">Tes fichiers sont lus dans ce navigateur. Rien n'est envoyé ni enregistré en ligne.</p>
+    <div class="top-right">
+      <div class="lang" role="group" aria-label="Langue / Lingua / Language">
+        <button type="button" data-lang="fr">FR</button><button type="button" data-lang="it">IT</button><button type="button" data-lang="en">EN</button>
+      </div>
+      <p class="privacy" data-i18n="privacy">Tes fichiers sont lus dans ce navigateur. Rien n'est envoyé ni enregistré en ligne.</p>
+    </div>
   </div>
 </header>
 
 <main class="wrap">
   <section class="files" aria-label="Fichiers">
     <div class="drop" data-kind="tracker">
-      <div class="drop-head"><span class="step">1</span><div><h2>Tracker factures</h2><p>Google Sheets → Fichier → Télécharger → <b>.xlsx</b></p></div></div>
-      <label class="btn ghost">Choisir le fichier<input type="file" accept=".xlsx,.xls,.csv" multiple hidden></label>
-      <div class="status" data-status="tracker">Aucun fichier</div>
+      <div class="drop-head"><span class="step">1</span><div><h2 data-i18n="c1_t">Tracker factures</h2><p data-i18n-html="c1_h">Google Sheets → Fichier → Télécharger → <b>.xlsx</b></p></div></div>
+      <label class="btn ghost"><span data-i18n="c1_b">Choisir le fichier</span><input type="file" accept=".xlsx,.xls,.csv" multiple hidden></label>
+      <div class="status" data-status="tracker" data-i18n="nofile">Aucun fichier</div>
     </div>
     <div class="drop" data-kind="ubs">
-      <div class="drop-head"><span class="step">2</span><div><h2>Relevés UBS</h2><p>PDF « Movimenti di conto », un ou plusieurs</p></div></div>
-      <label class="btn ghost">Choisir les PDF<input type="file" accept=".pdf" multiple hidden></label>
-      <div class="status" data-status="ubs">Aucun fichier</div>
+      <div class="drop-head"><span class="step">2</span><div><h2 data-i18n="c2_t">Relevés UBS</h2><p data-i18n="c2_h">PDF « Movimenti di conto », un ou plusieurs</p></div></div>
+      <label class="btn ghost"><span data-i18n="c2_b">Choisir les PDF</span><input type="file" accept=".pdf" multiple hidden></label>
+      <div class="status" data-status="ubs" data-i18n="nofile">Aucun fichier</div>
     </div>
     <div class="drop" data-kind="shopify">
-      <div class="drop-head"><span class="step">3</span><div><h2>Export Shopify</h2><p>Rapport « Contrôle paiements » → Export <b>.csv</b></p></div></div>
-      <label class="btn ghost">Choisir le CSV<input type="file" accept=".csv" hidden></label>
-      <div class="status" data-status="shopify">Aucun fichier</div>
+      <div class="drop-head"><span class="step">3</span><div><h2 data-i18n="c3_t">Export Shopify</h2><p data-i18n-html="c3_h">Rapport « Contrôle paiements » → Export <b>.csv</b></p></div></div>
+      <label class="btn ghost"><span data-i18n="c3_b">Choisir le CSV</span><input type="file" accept=".csv" hidden></label>
+      <div class="status" data-status="shopify" data-i18n="nofile">Aucun fichier</div>
     </div>
   </section>
 
   <div class="actions">
-    <button class="btn primary" id="run" disabled>Lancer le contrôle</button>
-    <button class="btn ghost" id="openSettings">Paramètres</button>
-    <span class="hint" id="runHint">Charge au moins le tracker et les relevés UBS. Shopify est recommandé.</span>
+    <button class="btn primary" id="run" disabled data-i18n="run">Lancer le contrôle</button>
+    <button class="btn ghost" id="openSettings" data-i18n="settings">Paramètres</button>
+    <span class="hint" id="runHint"></span>
   </div>
 
   <section id="results" hidden>
@@ -179,11 +197,11 @@ dialog::backdrop{background:rgba(20,22,30,.45)}
     <div class="kpis" id="kpis"></div>
     <nav class="tabs" id="tabs" role="tablist"></nav>
     <div class="toolbar">
-      <input type="search" id="filter" placeholder="Filtrer (client, n° de facture, montant…)">
+      <input type="search" id="filter" data-i18n-ph="filter">
       <div class="toolbar-actions">
-        <button class="btn ghost small" id="copySel" hidden>Copier la sélection pour les relances</button>
-        <button class="btn ghost small" id="exportTab">Exporter cet onglet (.csv)</button>
-        <button class="btn ghost small" id="exportAll">Tout exporter (.csv)</button>
+        <button class="btn ghost small" id="copySel" hidden data-i18n="copySel">Copier la sélection pour les relances</button>
+        <button class="btn ghost small" id="exportTab" data-i18n="exportTab">Exporter cet onglet (.csv)</button>
+        <button class="btn ghost small" id="exportAll" data-i18n="exportAll">Tout exporter (.csv)</button>
       </div>
     </div>
     <p class="tabnote" id="tabnote"></p>
@@ -193,35 +211,35 @@ dialog::backdrop{background:rgba(20,22,30,.45)}
 
 <dialog id="settings">
   <form method="dialog" class="settings">
-    <h2>Paramètres</h2>
-    <p class="muted">Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.</p>
+    <h2 data-i18n="settings">Paramètres</h2>
+    <p class="muted" data-i18n="s_intro">Enregistrés dans ce navigateur.</p>
 
-    <h3>Alias (même client, noms différents)</h3>
-    <p class="muted">Ex. « Malcanton » dans le tracker = « Green Web Solutions » sur UBS.</p>
+    <h3 data-i18n="s_alias">Alias</h3>
+    <p class="muted" data-i18n="s_alias_ex"></p>
     <div id="aliasList" class="kv"></div>
     <div class="kv-add">
-      <input id="aliasDe" placeholder="Nom dans le tracker / Shopify" list="knownNames">
+      <input id="aliasDe" data-i18n-ph="s_de" list="knownNames">
       <span>=</span>
-      <input id="aliasVers" placeholder="Nom sur le relevé UBS" list="knownNames">
-      <button type="button" class="btn ghost small" id="aliasAdd">Ajouter</button>
+      <input id="aliasVers" data-i18n-ph="s_vers" list="knownNames">
+      <button type="button" class="btn ghost small" id="aliasAdd" data-i18n="add">Ajouter</button>
     </div>
 
-    <h3>Virements à ignorer</h3>
-    <p class="muted">Virements internes, remboursements, apports… (le titulaire du compte est ignoré automatiquement).</p>
+    <h3 data-i18n="s_ignore">Virements à ignorer</h3>
+    <p class="muted" data-i18n="s_ignore_d"></p>
     <div id="ignoreList" class="kv"></div>
     <div class="kv-add">
-      <input id="ignoreName" placeholder="Nom de l'émetteur sur UBS" list="knownNames">
-      <button type="button" class="btn ghost small" id="ignoreAdd">Ajouter</button>
+      <input id="ignoreName" data-i18n-ph="s_ignore_ph" list="knownNames">
+      <button type="button" class="btn ghost small" id="ignoreAdd" data-i18n="add">Ajouter</button>
     </div>
 
-    <h3>Délai avant relance</h3>
-    <label class="inline"><input type="number" id="delai" min="0" max="365" step="1"> jours après la date de la facture</label>
+    <h3 data-i18n="s_delay">Délai avant relance</h3>
+    <label class="inline"><input type="number" id="delai" min="0" max="365" step="1"> <span data-i18n="s_delay_d">jours après la date de la facture</span></label>
 
     <div class="settings-foot">
-      <label class="btn ghost small">Importer (.json)<input type="file" id="importCfg" accept=".json" hidden></label>
-      <button type="button" class="btn ghost small" id="exportCfg">Exporter (.json)</button>
+      <label class="btn ghost small"><span data-i18n="s_import">Importer (.json)</span><input type="file" id="importCfg" accept=".json" hidden></label>
+      <button type="button" class="btn ghost small" id="exportCfg" data-i18n="s_export">Exporter (.json)</button>
       <span class="spacer"></span>
-      <button class="btn primary" value="close">Fermer</button>
+      <button class="btn primary" value="close" data-i18n="close">Fermer</button>
     </div>
   </form>
 </dialog>
@@ -721,14 +739,14 @@ function reconcile({ invoices, degust, orders, ubs, config }){
     const sum = round2(g.reduce((a, d) => a + d.amount, 0));
     const ref = g[0].paidDate || g[0].eventDate;
     const o = ords.find(o => !o.linkedTo && g[0].emails.includes(o.email) && Math.abs(o.amount - sum) <= Math.max(1, sum * 0.1) && (!ref || near(ref, o.date, 60)));
-    if (o){ o.linkedTo = g[0].uid; for (const d of g){ d.orderLinks.push(o); d.groupSum = sum; if (Math.abs(o.amount - sum) > 0.05){ d.flags.push(`une commande Shopify de ${o.amount.toFixed(2)} pour ${g.length} bons totalisant ${sum.toFixed(2)}`); d.orderEcart = round2(o.amount - sum); } } }
+    if (o){ o.linkedTo = g[0].uid; for (const d of g){ d.orderLinks.push(o); d.groupSum = sum; if (Math.abs(o.amount - sum) > 0.05){ d.flags.push({ k: 'f_group', p: { a: o.amount, n: g.length, s: sum } }); d.orderEcart = round2(o.amount - sum); } } }
   }
   // montant différent mais même client et même période
   for (const d of pass1){
     if (d.orderLinks.length) continue;
     const ref = d.paidDate || d.eventDate;
     const tol = degCands(d, ref, 45).filter(e => e.s >= STRONG && Math.abs(e.o.amount - d.amount) <= d.amount * 0.25);
-    if (tol.length){ const o = tol[0].o; d.orderLinks.push(o); o.linkedTo = d.uid; d.orderEcart = round2(o.amount - d.amount); d.flags.push(`commande ${o.name} de ${o.amount.toFixed(2)} au lieu de ${d.amount.toFixed(2)}`); }
+    if (tol.length){ const o = tol[0].o; d.orderLinks.push(o); o.linkedTo = d.uid; d.orderEcart = round2(o.amount - d.amount); d.flags.push({ k: 'f_amount', p: { o: o.name, a: o.amount, b: d.amount } }); }
   }
   linkInvoiceOrders(inv.filter(x => !x.date));
 
@@ -804,38 +822,38 @@ function reconcile({ invoices, degust, orders, ubs, config }){
     return '';
   };
 
-  // ---------- statuts ----------
+  // ---------- statuts (textes traduits dans l'interface : rk = clé du motif, rp = paramètres) ----------
   const out = [];
   const age = (d) => d && asOf ? daysBetween(d, asOf) : null;
   const shopTxt = (o) => o ? `${o.name} (${o.status || '?'})` : '';
-  const payTxt = (p) => `${fmtDate(p.date)} · ${p.from}${p.groupe ? ` (virement groupé ×${p.groupe})` : ''}${p.ecart ? ` · écart ${p.ecart > 0 ? '+' : ''}${p.ecart.toFixed(2)}` : ''}`;
-  const payersByInvoiceClient = (x) => payers.filter(p => p.invoiceClients.has(x.client) || p.names.some(n => idx.score(x.client, n) >= STRONG));
+  const pays = (list) => list.map(p => ({ date: p.date, from: p.from, groupe: p.groupe || 0, ecart: p.ecart || 0 }));
+  const set = (r, statut, rk, rp) => { r.statut = statut; r.rk = rk; r.rp = rp || {}; };
 
   for (const x of inv){
-    const r = { type: 'Facture', ref: x.id || '–', client: x.client, montant: x.amount, date: x.date, dateApprox: x.dateApprox, age: age(x.date),
-                shopify: shopTxt(x.order), email: (x.order && x.order.email) || emailFor(invNames(x)), tracker: x.section === 'closed' ? 'Closed' : 'Opened', note: x.note, paiement: x.payments.map(payTxt).join(' + '), src: x, flags: [] };
+    const r = { type: 'facture', ref: x.id || '–', client: x.client, montant: x.amount, date: x.date, dateApprox: x.dateApprox, age: age(x.date),
+                shopify: shopTxt(x.order), email: (x.order && x.order.email) || emailFor(invNames(x)), tracker: x.section === 'closed' ? 'Closed' : 'Opened', note: x.note, pays: pays(x.payments), flags: [] };
     const paid = x.payments.length > 0, ecart = x.payments.some(p => p.ecart);
     const notePaypal = /paypal/i.test(x.note + ' ' + x.sent), noteCleme = /cleme|clémence/i.test(x.note);
     if (x.section === 'closed'){
-      if (paid){ r.statut = ecart ? 'verifier' : 'ok'; r.raison = ecart ? 'Payée avec un écart de montant' : 'Payée'; }
-      else if (notePaypal){ r.statut = 'info'; r.raison = 'Payée via PayPal (hors UBS)'; }
-      else if (noteCleme){ r.statut = 'info'; r.raison = 'Payée sur le compte de Clémence'; }
-      else if (x.date && ubsStart && x.date < addDays(ubsStart, -45)){ r.statut = 'info'; r.raison = 'Antérieure aux relevés UBS chargés'; }
-      else { r.statut = 'info'; r.raison = 'Fermée, aucun virement UBS trouvé (TWINT, carte ou espèces ?)'; }
+      if (paid) set(r, ecart ? 'verifier' : 'ok', ecart ? 'paid_ecart' : 'paid');
+      else if (notePaypal) set(r, 'info', 'paypal_closed');
+      else if (noteCleme) set(r, 'info', 'cleme_closed');
+      else if (x.date && ubsStart && x.date < addDays(ubsStart, -45)) set(r, 'info', 'before_ubs');
+      else set(r, 'info', 'closed_no_trace');
     } else {
       // une autre facture du même client, même montant, a pris le seul virement → doublon ?
       const twin = inv.find(y => y !== x && y.section === 'open' && y.payments.length && y.amount === x.amount && (!x.date || !y.date || x.dateFromShopify || y.dateFromShopify || Math.abs(daysBetween(x.date, y.date)) <= 20)
                                  && y.payments.some(p => idx.score(x.client, p.from) >= STRONG || (x.order && idx.score(x.order.customer, p.from) >= STRONG)));
-      if (paid){ r.statut = ecart ? 'verifier' : 'fermer'; r.raison = ecart ? 'Virement reçu avec un écart de montant — à vérifier puis fermer' : 'Virement reçu — à passer en Closed'; }
-      else if (x.amount === null){ r.statut = 'verifier'; r.raison = 'Montant manquant dans le tracker'; }
-      else if (notePaypal){ r.statut = 'verifier'; r.raison = 'Paiement PayPal annoncé — à contrôler dans PayPal'; }
-      else if (noteCleme){ r.statut = 'verifier'; r.raison = 'Paiement annoncé sur le compte de Clémence'; }
-      else if (twin){ r.statut = 'verifier'; r.raison = `Un seul virement reçu pour 2 factures de ${x.amount.toFixed(2)} (avec ${twin.id || twin.client}) — doublon ?`; }
-      else if (isYes(x.paidMark)){ r.statut = 'verifier'; r.raison = 'Marquée « Pagata » mais aucun virement UBS trouvé'; }
-      else if (!x.id && x.order && x.order.status === 'paid'){ r.statut = 'verifier'; r.raison = 'Sans n° de facture, payée selon Shopify (TWINT ou carte ?)'; }
-      else if (r.age !== null && r.age < delai){ r.statut = 'attente'; r.raison = `Envoyée il y a ${r.age} j — dans le délai`; }
-      else { r.statut = 'relancer'; r.raison = r.age !== null ? `Aucun paiement trouvé depuis ${r.age} jours` : 'Aucun paiement trouvé (date inconnue)'; if (x.order && x.order.status === 'paid') r.flags.push('marquée payée dans Shopify'); }
-      if (!x.order && x.amount !== null) r.flags.push('pas de commande Shopify correspondante');
+      if (paid) set(r, ecart ? 'verifier' : 'fermer', ecart ? 'to_close_ecart' : 'to_close');
+      else if (x.amount === null) set(r, 'verifier', 'missing_amount');
+      else if (notePaypal) set(r, 'verifier', 'paypal_open');
+      else if (noteCleme) set(r, 'verifier', 'cleme_open');
+      else if (twin) set(r, 'verifier', 'twin', { a: x.amount, other: twin.id || twin.client });
+      else if (isYes(x.paidMark)) set(r, 'verifier', 'marked_paid');
+      else if (!x.id && x.order && x.order.status === 'paid') set(r, 'verifier', 'noid_shopify_paid');
+      else if (r.age !== null && r.age < delai) set(r, 'attente', 'in_delay', { d: r.age });
+      else { set(r, 'relancer', r.age !== null ? 'no_payment_days' : 'no_payment_nodate', { d: r.age }); if (x.order && x.order.status === 'paid') r.flags.push({ k: 'f_shopify_paid' }); }
+      if (!x.order && x.amount !== null) r.flags.push({ k: 'f_no_order' });
     }
     out.push(r);
   }
@@ -843,31 +861,31 @@ function reconcile({ invoices, degust, orders, ubs, config }){
   for (const d of deg){
     const o = d.orderLinks[0];
     const ref = d.paidDate || d.eventDate;
-    const r = { type: 'Dégustation', ref: d.details ? d.details.slice(0, 70) : '–', client: d.client || '?', montant: d.amount, date: ref, age: null,
-                shopify: d.orderLinks.length ? [...new Set(d.orderLinks)].map(shopTxt).join(' + ') : (d.shopifyMark ? `tracker : ${d.shopifyMark}` : ''),
-                email: d.emails[0] || (o && o.email) || emailFor([d.client]), tracker: d.paidRaw, note: d.flags.join(' · '), paiement: d.payments.map(payTxt).join(' + '), src: d, flags: [] };
-    if (d.free){ r.statut = 'info'; r.raison = 'Gratuit'; }
-    else if (d.amount === null){ r.statut = 'verifier'; r.raison = 'Ligne incomplète (client ou montant manquant)'; }
-    else if (o && /pending|partially_paid|authorized/.test(o.status)){ r.statut = 'relancer'; r.raison = `Commande Shopify ${o.name} en attente de paiement`; }
-    else if (o && d.orderEcart < -0.05){ r.statut = 'verifier'; r.raison = `Commande Shopify trouvée mais montant inférieur (${d.orderEcart.toFixed(2)})`; }
-    else if (o){ r.statut = 'ok'; r.raison = `Payée via Shopify`; }
-    else if (d.payments.length){ r.statut = 'ok'; r.raison = 'Payée par virement'; }
-    else if (ref && dataStart && ref < dataStart){ r.statut = 'info'; r.raison = 'Antérieure aux exports chargés'; }
-    else if (/after the event|dopo|après/i.test(d.paidRaw)){ r.statut = 'verifier'; r.raison = 'Paiement attendu après l’événement — aucun virement trouvé'; }
-    else if (/check|\?/i.test(d.paidRaw) || !d.paidRaw){ r.statut = 'verifier'; r.raison = 'Aucune commande Shopify ni virement trouvé'; }
-    else { r.statut = 'verifier'; r.raison = 'Marquée payée dans le tracker, mais aucune trace Shopify/UBS'; }
+    const r = { type: 'degust', ref: d.details ? d.details.slice(0, 70) : '–', client: d.client || '?', montant: d.amount, date: ref, age: null,
+                shopify: d.orderLinks.length ? [...new Set(d.orderLinks)].map(shopTxt).join(' + ') : '', shopifyMark: d.orderLinks.length ? '' : d.shopifyMark,
+                email: d.emails[0] || (o && o.email) || emailFor([d.client]), tracker: d.paidRaw, note: '', pays: pays(d.payments), flags: d.flags.slice() };
+    if (d.free) set(r, 'info', 'free');
+    else if (d.amount === null) set(r, 'verifier', 'incomplete');
+    else if (o && /pending|partially_paid|authorized/.test(o.status)) set(r, 'relancer', 'order_pending', { o: o.name });
+    else if (o && d.orderEcart < -0.05) set(r, 'verifier', 'order_lower', { diff: d.orderEcart });
+    else if (o) set(r, 'ok', 'paid_shopify');
+    else if (d.payments.length) set(r, 'ok', 'paid_transfer');
+    else if (ref && dataStart && ref < dataStart) set(r, 'info', 'before_exports');
+    else if (/after the event|dopo|après/i.test(d.paidRaw)) set(r, 'verifier', 'after_event');
+    else if (/check|\?/i.test(d.paidRaw) || !d.paidRaw) set(r, 'verifier', 'no_trace');
+    else set(r, 'verifier', 'marked_paid_no_trace');
     out.push(r);
   }
 
   for (const o of ords){
     if (!/pending|partially_paid|authorized/.test(o.status)) continue;
     const linked = o.linkedTo ? byUid.get(o.linkedTo) : null;
-    const pays = linked ? linked.payments : o.payments;
-    const r = { type: 'Commande Shopify', ref: o.name, client: o.customer || '(sans nom)', montant: o.amount, date: o.date, dateApprox: true, age: age(o.date), shopify: shopTxt(o), email: o.email,
-                tracker: linked ? (linked.id || linked.client) : '', note: linked && linked.client ? `liée à ${linked.kind === 'facture' ? 'la facture' : 'la dégustation'} ${linked.id || linked.client}` : '', paiement: pays.map(payTxt).join(' + '), src: o, flags: [] };
-    if (pays.length){ r.statut = 'verifier'; r.raison = 'Virement reçu mais commande encore « en attente » dans Shopify — à marquer payée'; }
-    else if (linked){ continue; }  // déjà suivie via la facture / la dégustation
-    else { r.statut = r.age !== null && r.age < delai ? 'attente' : 'relancer'; r.raison = `Commande en attente de paiement (${o.status})`; }
+    const ps = linked ? linked.payments : o.payments;
+    const r = { type: 'commande', ref: o.name, client: o.customer || '', montant: o.amount, date: o.date, dateApprox: true, age: age(o.date), shopify: shopTxt(o), email: o.email,
+                tracker: linked ? (linked.id || linked.client) : '', note: '', link: linked ? { kind: linked.kind, ref: linked.id || linked.client } : null, pays: pays(ps), flags: [] };
+    if (ps.length) set(r, 'verifier', 'pending_but_paid');
+    else if (linked) continue;  // déjà suivie via la facture / la dégustation
+    else set(r, r.age !== null && r.age < delai ? 'attente' : 'relancer', 'pending', { s: o.status });
     out.push(r);
   }
 
@@ -896,16 +914,216 @@ function reconcile({ invoices, degust, orders, ubs, config }){
 
 
 
-// ===================== Contrôle paiements — interface =====================
+// ===================== Contrôle paiements — interface (FR / IT / EN) =====================
 (function(){
   if (typeof document === 'undefined') return;
   if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // ---------- textes ----------
+  const I18N = {
+    fr: {
+      eyebrow: 'Caffè Suiso · interne', title: 'Contrôle des paiements', doc: 'Contrôle paiements',
+      privacy: "Tes fichiers sont lus dans ce navigateur. Rien n'est envoyé ni enregistré en ligne.",
+      c1_t: 'Tracker factures', c1_h: 'Google Sheets → Fichier → Télécharger → <b>.xlsx</b>', c1_b: 'Choisir le fichier',
+      c2_t: 'Relevés UBS', c2_h: 'PDF « Movimenti di conto », un ou plusieurs', c2_b: 'Choisir les PDF',
+      c3_t: 'Export Shopify', c3_h: 'Rapport « Contrôle paiements » → Export <b>.csv</b>', c3_b: 'Choisir le CSV',
+      nofile: 'Aucun fichier', reading: 'Lecture…', run: 'Lancer le contrôle', settings: 'Paramètres',
+      h_notready: 'Charge au moins le tracker et les relevés UBS. Shopify est recommandé.', h_ready: 'Tout est prêt.',
+      h_noshop: 'Prêt — sans Shopify, les commandes et dégustations seront moins bien rapprochées.',
+      st_tracker: '✓ {n} factures ({o} ouvertes)', st_degust: '{d} dégustations (onglet « {s} »)', err_noinv: 'aucune facture trouvée (il faut une ligne d’en-tête « Fattura »)',
+      st_ubs: '✓ {n} relevé(s) · {m} mouvements', fromto: 'du {a} au {b}', bal_ok: 'soldes vérifiés', bal_ko: 'soldes à contrôler (relevé manquant ?)', clear: 'vider',
+      st_shop: '✓ {n} commandes', monthly: 'dates au mois près (ajoute « Day » au rapport pour plus de précision)', err_read: 'Impossible de lire ce fichier : {e}',
+      asof: 'Situation au <b>{d}</b> (dernier mouvement UBS) · relevés du {a} au {b}', chain_ko: 'soldes non continus : un relevé manque peut-être',
+      k_rel: 'à relancer', k_ver: 'à vérifier', k_fer: 'payées, à fermer', k_cli: 'commandes sans virement', k_non: 'virements non identifiés',
+      t_rel: 'À relancer', t_ver: 'À vérifier', t_fer: 'À fermer', t_cli: 'Clients par virement', t_non: 'Virements non identifiés', t_deg: 'Dégustations', t_fac: 'Toutes les factures',
+      n_rel: 'Aucun paiement trouvé après le délai. La date « approx. » vient du libellé de la facture ou de la commande Shopify.',
+      n_ver: 'Cas ambigus : écart de montant, PayPal, doublon possible, ligne incomplète, statut Shopify à corriger…',
+      n_fer: 'Factures encore « Opened » dans le tracker alors que le virement est arrivé.',
+      n_cli: 'Clients qui paient par virement : commandes Shopify sans virement correspondant (plus anciennes que le délai). Indicatif — certaines ont pu être payées par TWINT ou carte.',
+      n_non: 'Virements reçus qu’aucune facture ni commande n’explique. « Associer » crée un alias, « Ignorer » les retire du contrôle.',
+      n_deg: 'Bons et dégustations du tracker, rapprochés avec Shopify (email, nom, montant) puis UBS.',
+      n_fac: 'Toutes les factures du tracker avec leur statut calculé.',
+      filter: 'Filtrer (client, n° de facture, montant…)', copySel: 'Copier la sélection pour les relances', copied: 'Copié ({n})',
+      exportTab: 'Exporter cet onglet (.csv)', exportAll: 'Tout exporter (.csv)', empty: 'Rien ici. 👌', nores: 'Aucun résultat pour ce filtre.',
+      col_inv: 'Facture', col_client: 'Client', col_amount: 'Montant', col_date: 'Date', col_days: 'Jours', col_email: 'Email', col_why: 'Pourquoi',
+      col_type: 'Type', col_ref: 'Réf.', col_payfound: 'Paiement trouvé', col_invdate: 'Date facture', col_received: 'Virement reçu',
+      col_payer: 'Payeur (UBS)', col_shopcli: 'Client(s) Shopify', col_recv: 'Virements reçus', col_ordered: 'Commandé', col_notr: 'Sans virement',
+      col_detail: 'Détail', col_last: 'Dernier virement', col_sender: 'Émetteur', col_label: 'Libellé', col_status: 'Statut', col_details: 'Détails',
+      col_tracker: 'Tracker', col_payment: 'Paiement', col_note: 'Note', col_approx: 'Date approx.',
+      approx: 'approx.', unknown: 'inconnue', n_tr: '{n} virement(s)', n_ord: '{n} commande(s)', see: 'voir', note: 'Note : ', yes: 'oui',
+      link: 'Associer à un client', ignore: 'Ignorer', link_ph: 'Client (tracker ou Shopify)', ok: 'OK',
+      ty_facture: 'Facture', ty_degust: 'Dégustation', ty_commande: 'Commande Shopify', ty_ubs: 'Virement UBS', noname: '(sans nom)',
+      s_relancer: 'À relancer', s_verifier: 'À vérifier', s_fermer: 'Payée · à fermer', s_ok: 'Payée', s_info: 'Info', s_attente: 'Dans le délai', s_nonid: 'Non identifié',
+      pay_group: ' (virement groupé ×{n})', pay_diff: ' · écart {d}', trk: 'tracker : {v}', linked_f: 'liée à la facture {r}', linked_d: 'liée à la dégustation {r}',
+      cp_inv: 'facture {r}', cp_nodate: 'date inconnue', copy_prompt: 'Copie ce texte :', nonid_why: 'Virement sans facture ni commande correspondante',
+      s_intro: 'Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.',
+      s_alias: 'Alias (même client, noms différents)', s_alias_ex: 'Ex. « Malcanton » dans le tracker = « Green Web Solutions » sur UBS.',
+      s_de: 'Nom dans le tracker / Shopify', s_vers: 'Nom sur le relevé UBS', add: 'Ajouter', s_noalias: 'Aucun alias.',
+      s_ignore: 'Virements à ignorer', s_ignore_d: 'Virements internes, remboursements, apports… (le titulaire du compte est ignoré automatiquement).',
+      s_ignore_ph: "Nom de l'émetteur sur UBS", s_none: 'Aucun.', s_delay: 'Délai avant relance', s_delay_d: 'jours après la date de la facture',
+      s_import: 'Importer (.json)', s_export: 'Exporter (.json)', close: 'Fermer', del: 'Supprimer', s_bad: 'Fichier de paramètres illisible.',
+      r: {
+        paid: 'Payée', paid_ecart: 'Payée avec un écart de montant', paypal_closed: 'Payée via PayPal (hors UBS)', cleme_closed: 'Payée sur le compte de Clémence',
+        before_ubs: 'Antérieure aux relevés UBS chargés', closed_no_trace: 'Fermée, aucun virement UBS trouvé (TWINT, carte ou espèces ?)',
+        to_close: 'Virement reçu — à passer en Closed', to_close_ecart: 'Virement reçu avec un écart de montant — à vérifier puis fermer',
+        missing_amount: 'Montant manquant dans le tracker', paypal_open: 'Paiement PayPal annoncé — à contrôler dans PayPal', cleme_open: 'Paiement annoncé sur le compte de Clémence',
+        twin: 'Un seul virement reçu pour 2 factures de {a} (avec {other}) — doublon ?', marked_paid: 'Marquée « Pagata » mais aucun virement UBS trouvé',
+        noid_shopify_paid: 'Sans n° de facture, payée selon Shopify (TWINT ou carte ?)', in_delay: 'Envoyée il y a {d} j — dans le délai',
+        no_payment_days: 'Aucun paiement trouvé depuis {d} jours', no_payment_nodate: 'Aucun paiement trouvé (date inconnue)',
+        free: 'Gratuit', incomplete: 'Ligne incomplète (client ou montant manquant)', order_pending: 'Commande Shopify {o} en attente de paiement',
+        order_lower: 'Commande Shopify trouvée mais montant inférieur ({diff})', paid_shopify: 'Payée via Shopify', paid_transfer: 'Payée par virement',
+        before_exports: 'Antérieure aux exports chargés', after_event: 'Paiement attendu après l’événement — aucun virement trouvé',
+        no_trace: 'Aucune commande Shopify ni virement trouvé', marked_paid_no_trace: 'Marquée payée dans le tracker, mais aucune trace Shopify/UBS',
+        pending_but_paid: 'Virement reçu mais commande encore « en attente » dans Shopify — à marquer payée', pending: 'Commande en attente de paiement ({s})',
+        f_shopify_paid: 'marquée payée dans Shopify', f_no_order: 'pas de commande Shopify correspondante',
+        f_group: 'une commande Shopify de {a} pour {n} bons totalisant {s}', f_amount: 'commande {o} de {a} au lieu de {b}',
+      }
+    },
+    it: {
+      eyebrow: 'Caffè Suiso · interno', title: 'Controllo pagamenti', doc: 'Controllo pagamenti',
+      privacy: 'I file vengono letti in questo browser. Nulla viene inviato o salvato online.',
+      c1_t: 'Tracker fatture', c1_h: 'Google Sheets → File → Scarica → <b>.xlsx</b>', c1_b: 'Scegli il file',
+      c2_t: 'Estratti UBS', c2_h: 'PDF «Movimenti di conto», uno o più', c2_b: 'Scegli i PDF',
+      c3_t: 'Export Shopify', c3_h: 'Report «Contrôle paiements» → Esporta <b>.csv</b>', c3_b: 'Scegli il CSV',
+      nofile: 'Nessun file', reading: 'Lettura…', run: 'Avvia il controllo', settings: 'Impostazioni',
+      h_notready: 'Carica almeno il tracker e gli estratti UBS. Shopify è consigliato.', h_ready: 'Tutto pronto.',
+      h_noshop: 'Pronto — senza Shopify, ordini e degustazioni saranno abbinati meno bene.',
+      st_tracker: '✓ {n} fatture ({o} aperte)', st_degust: '{d} degustazioni (foglio «{s}»)', err_noinv: 'nessuna fattura trovata (serve una riga di intestazione «Fattura»)',
+      st_ubs: '✓ {n} estratto/i · {m} movimenti', fromto: 'dal {a} al {b}', bal_ok: 'saldi verificati', bal_ko: 'saldi da controllare (manca un estratto?)', clear: 'svuota',
+      st_shop: '✓ {n} ordini', monthly: 'date al mese (aggiungi «Day» al report per più precisione)', err_read: 'Impossibile leggere il file: {e}',
+      asof: 'Situazione al <b>{d}</b> (ultimo movimento UBS) · estratti dal {a} al {b}', chain_ko: 'saldi non continui: forse manca un estratto',
+      k_rel: 'da sollecitare', k_ver: 'da verificare', k_fer: 'pagate, da chiudere', k_cli: 'ordini senza bonifico', k_non: 'bonifici non identificati',
+      t_rel: 'Da sollecitare', t_ver: 'Da verificare', t_fer: 'Da chiudere', t_cli: 'Clienti con bonifico', t_non: 'Bonifici non identificati', t_deg: 'Degustazioni', t_fac: 'Tutte le fatture',
+      n_rel: 'Nessun pagamento trovato dopo il termine. La data «appross.» viene dal nome della fattura o dall’ordine Shopify.',
+      n_ver: 'Casi dubbi: differenza d’importo, PayPal, possibile doppione, riga incompleta, stato Shopify da correggere…',
+      n_fer: 'Fatture ancora «Opened» nel tracker anche se il bonifico è arrivato.',
+      n_cli: 'Clienti che pagano con bonifico: ordini Shopify senza bonifico corrispondente (più vecchi del termine). Indicativo — alcuni possono essere stati pagati con TWINT o carta.',
+      n_non: 'Bonifici ricevuti che nessuna fattura né ordine spiega. «Associa» crea un alias, «Ignora» li esclude dal controllo.',
+      n_deg: 'Buoni e degustazioni del tracker, abbinati a Shopify (email, nome, importo) e poi a UBS.',
+      n_fac: 'Tutte le fatture del tracker con lo stato calcolato.',
+      filter: 'Filtra (cliente, n° fattura, importo…)', copySel: 'Copia la selezione per i solleciti', copied: 'Copiato ({n})',
+      exportTab: 'Esporta questa scheda (.csv)', exportAll: 'Esporta tutto (.csv)', empty: 'Niente qui. 👌', nores: 'Nessun risultato per questo filtro.',
+      col_inv: 'Fattura', col_client: 'Cliente', col_amount: 'Importo', col_date: 'Data', col_days: 'Giorni', col_email: 'Email', col_why: 'Motivo',
+      col_type: 'Tipo', col_ref: 'Rif.', col_payfound: 'Pagamento trovato', col_invdate: 'Data fattura', col_received: 'Bonifico ricevuto',
+      col_payer: 'Ordinante (UBS)', col_shopcli: 'Cliente/i Shopify', col_recv: 'Bonifici ricevuti', col_ordered: 'Ordinato', col_notr: 'Senza bonifico',
+      col_detail: 'Dettaglio', col_last: 'Ultimo bonifico', col_sender: 'Ordinante', col_label: 'Causale', col_status: 'Stato', col_details: 'Dettagli',
+      col_tracker: 'Tracker', col_payment: 'Pagamento', col_note: 'Nota', col_approx: 'Data appross.',
+      approx: 'appross.', unknown: 'sconosciuta', n_tr: '{n} bonifico/i', n_ord: '{n} ordine/i', see: 'vedi', note: 'Nota: ', yes: 'sì',
+      link: 'Associa a un cliente', ignore: 'Ignora', link_ph: 'Cliente (tracker o Shopify)', ok: 'OK',
+      ty_facture: 'Fattura', ty_degust: 'Degustazione', ty_commande: 'Ordine Shopify', ty_ubs: 'Bonifico UBS', noname: '(senza nome)',
+      s_relancer: 'Da sollecitare', s_verifier: 'Da verificare', s_fermer: 'Pagata · da chiudere', s_ok: 'Pagata', s_info: 'Info', s_attente: 'Nei termini', s_nonid: 'Non identificato',
+      pay_group: ' (bonifico cumulativo ×{n})', pay_diff: ' · differenza {d}', trk: 'tracker: {v}', linked_f: 'collegato alla fattura {r}', linked_d: 'collegato alla degustazione {r}',
+      cp_inv: 'fattura {r}', cp_nodate: 'data sconosciuta', copy_prompt: 'Copia questo testo:', nonid_why: 'Bonifico senza fattura né ordine corrispondente',
+      s_intro: 'Salvate in questo browser. Esportale per conservarle o usarle su un altro computer.',
+      s_alias: 'Alias (stesso cliente, nomi diversi)', s_alias_ex: 'Es. «Malcanton» nel tracker = «Green Web Solutions» su UBS.',
+      s_de: 'Nome nel tracker / Shopify', s_vers: 'Nome sull’estratto UBS', add: 'Aggiungi', s_noalias: 'Nessun alias.',
+      s_ignore: 'Bonifici da ignorare', s_ignore_d: 'Bonifici interni, rimborsi, apporti… (il titolare del conto viene ignorato automaticamente).',
+      s_ignore_ph: 'Nome dell’ordinante su UBS', s_none: 'Nessuno.', s_delay: 'Termine prima del sollecito', s_delay_d: 'giorni dopo la data della fattura',
+      s_import: 'Importa (.json)', s_export: 'Esporta (.json)', close: 'Chiudi', del: 'Elimina', s_bad: 'File di impostazioni illeggibile.',
+      r: {
+        paid: 'Pagata', paid_ecart: 'Pagata con una differenza d’importo', paypal_closed: 'Pagata con PayPal (fuori UBS)', cleme_closed: 'Pagata sul conto di Clémence',
+        before_ubs: 'Precedente agli estratti UBS caricati', closed_no_trace: 'Chiusa, nessun bonifico UBS trovato (TWINT, carta o contanti?)',
+        to_close: 'Bonifico ricevuto — da passare in Closed', to_close_ecart: 'Bonifico ricevuto con una differenza d’importo — verificare e poi chiudere',
+        missing_amount: 'Importo mancante nel tracker', paypal_open: 'Pagamento PayPal annunciato — da controllare su PayPal', cleme_open: 'Pagamento annunciato sul conto di Clémence',
+        twin: 'Un solo bonifico ricevuto per 2 fatture da {a} (con {other}) — doppione?', marked_paid: 'Segnata «Pagata» ma nessun bonifico UBS trovato',
+        noid_shopify_paid: 'Senza n° di fattura, pagata secondo Shopify (TWINT o carta?)', in_delay: 'Inviata {d} giorni fa — nei termini',
+        no_payment_days: 'Nessun pagamento trovato da {d} giorni', no_payment_nodate: 'Nessun pagamento trovato (data sconosciuta)',
+        free: 'Gratuito', incomplete: 'Riga incompleta (cliente o importo mancante)', order_pending: 'Ordine Shopify {o} in attesa di pagamento',
+        order_lower: 'Ordine Shopify trovato ma importo inferiore ({diff})', paid_shopify: 'Pagata tramite Shopify', paid_transfer: 'Pagata con bonifico',
+        before_exports: 'Precedente agli export caricati', after_event: 'Pagamento previsto dopo l’evento — nessun bonifico trovato',
+        no_trace: 'Nessun ordine Shopify né bonifico trovato', marked_paid_no_trace: 'Segnata pagata nel tracker, ma nessuna traccia su Shopify/UBS',
+        pending_but_paid: 'Bonifico ricevuto ma ordine ancora «in attesa» su Shopify — da segnare come pagato', pending: 'Ordine in attesa di pagamento ({s})',
+        f_shopify_paid: 'segnata pagata su Shopify', f_no_order: 'nessun ordine Shopify corrispondente',
+        f_group: 'un ordine Shopify da {a} per {n} buoni per un totale di {s}', f_amount: 'ordine {o} da {a} invece di {b}',
+      }
+    },
+    en: {
+      eyebrow: 'Caffè Suiso · internal', title: 'Payment check', doc: 'Payment check',
+      privacy: 'Your files are read in this browser. Nothing is sent or stored online.',
+      c1_t: 'Invoice tracker', c1_h: 'Google Sheets → File → Download → <b>.xlsx</b>', c1_b: 'Choose file',
+      c2_t: 'UBS statements', c2_h: 'PDF "Movimenti di conto", one or more', c2_b: 'Choose PDFs',
+      c3_t: 'Shopify export', c3_h: 'Report "Contrôle paiements" → Export <b>.csv</b>', c3_b: 'Choose CSV',
+      nofile: 'No file', reading: 'Reading…', run: 'Run the check', settings: 'Settings',
+      h_notready: 'Load at least the tracker and the UBS statements. Shopify is recommended.', h_ready: 'All set.',
+      h_noshop: 'Ready — without Shopify, orders and tastings will be matched less accurately.',
+      st_tracker: '✓ {n} invoices ({o} open)', st_degust: '{d} tastings (sheet "{s}")', err_noinv: 'no invoice found (a "Fattura" header row is required)',
+      st_ubs: '✓ {n} statement(s) · {m} transactions', fromto: 'from {a} to {b}', bal_ok: 'balances verified', bal_ko: 'balances to check (missing statement?)', clear: 'clear',
+      st_shop: '✓ {n} orders', monthly: 'dates by month only (add "Day" to the report for more precision)', err_read: "Couldn't read this file: {e}",
+      asof: 'Status as of <b>{d}</b> (last UBS transaction) · statements from {a} to {b}', chain_ko: 'balances not continuous: a statement may be missing',
+      k_rel: 'to chase', k_ver: 'to check', k_fer: 'paid, to close', k_cli: 'orders without transfer', k_non: 'unidentified transfers',
+      t_rel: 'To chase', t_ver: 'To check', t_fer: 'To close', t_cli: 'Bank-transfer clients', t_non: 'Unidentified transfers', t_deg: 'Tastings', t_fac: 'All invoices',
+      n_rel: 'No payment found after the delay. "Approx." dates come from the invoice label or the Shopify order.',
+      n_ver: 'Unclear cases: amount difference, PayPal, possible duplicate, incomplete row, Shopify status to fix…',
+      n_fer: 'Invoices still "Opened" in the tracker although the transfer has arrived.',
+      n_cli: 'Clients who pay by bank transfer: Shopify orders with no matching transfer (older than the delay). Indicative — some may have been paid by TWINT or card.',
+      n_non: 'Transfers received that no invoice or order explains. "Link" creates an alias, "Ignore" removes them from the check.',
+      n_deg: 'Vouchers and tastings from the tracker, matched with Shopify (email, name, amount) then UBS.',
+      n_fac: 'All tracker invoices with their computed status.',
+      filter: 'Filter (client, invoice no., amount…)', copySel: 'Copy selection for reminders', copied: 'Copied ({n})',
+      exportTab: 'Export this tab (.csv)', exportAll: 'Export all (.csv)', empty: 'Nothing here. 👌', nores: 'No results for this filter.',
+      col_inv: 'Invoice', col_client: 'Client', col_amount: 'Amount', col_date: 'Date', col_days: 'Days', col_email: 'Email', col_why: 'Why',
+      col_type: 'Type', col_ref: 'Ref.', col_payfound: 'Payment found', col_invdate: 'Invoice date', col_received: 'Transfer received',
+      col_payer: 'Payer (UBS)', col_shopcli: 'Shopify client(s)', col_recv: 'Transfers received', col_ordered: 'Ordered', col_notr: 'Without transfer',
+      col_detail: 'Details', col_last: 'Last transfer', col_sender: 'Sender', col_label: 'Description', col_status: 'Status', col_details: 'Details',
+      col_tracker: 'Tracker', col_payment: 'Payment', col_note: 'Note', col_approx: 'Approx. date',
+      approx: 'approx.', unknown: 'unknown', n_tr: '{n} transfer(s)', n_ord: '{n} order(s)', see: 'see', note: 'Note: ', yes: 'yes',
+      link: 'Link to a client', ignore: 'Ignore', link_ph: 'Client (tracker or Shopify)', ok: 'OK',
+      ty_facture: 'Invoice', ty_degust: 'Tasting', ty_commande: 'Shopify order', ty_ubs: 'UBS transfer', noname: '(no name)',
+      s_relancer: 'To chase', s_verifier: 'To check', s_fermer: 'Paid · to close', s_ok: 'Paid', s_info: 'Info', s_attente: 'Within terms', s_nonid: 'Unidentified',
+      pay_group: ' (combined transfer ×{n})', pay_diff: ' · difference {d}', trk: 'tracker: {v}', linked_f: 'linked to invoice {r}', linked_d: 'linked to tasting {r}',
+      cp_inv: 'invoice {r}', cp_nodate: 'unknown date', copy_prompt: 'Copy this text:', nonid_why: 'Transfer with no matching invoice or order',
+      s_intro: 'Saved in this browser. Export them to keep them or use them on another computer.',
+      s_alias: 'Aliases (same client, different names)', s_alias_ex: 'E.g. "Malcanton" in the tracker = "Green Web Solutions" on UBS.',
+      s_de: 'Name in tracker / Shopify', s_vers: 'Name on UBS statement', add: 'Add', s_noalias: 'No aliases.',
+      s_ignore: 'Transfers to ignore', s_ignore_d: 'Internal transfers, refunds, contributions… (the account holder is ignored automatically).',
+      s_ignore_ph: 'Sender name on UBS', s_none: 'None.', s_delay: 'Delay before reminder', s_delay_d: 'days after the invoice date',
+      s_import: 'Import (.json)', s_export: 'Export (.json)', close: 'Close', del: 'Delete', s_bad: 'Unreadable settings file.',
+      r: {
+        paid: 'Paid', paid_ecart: 'Paid with an amount difference', paypal_closed: 'Paid via PayPal (outside UBS)', cleme_closed: "Paid into Clémence's account",
+        before_ubs: 'Older than the UBS statements loaded', closed_no_trace: 'Closed, no UBS transfer found (TWINT, card or cash?)',
+        to_close: 'Transfer received — mark as Closed', to_close_ecart: 'Transfer received with an amount difference — check, then close',
+        missing_amount: 'Amount missing in the tracker', paypal_open: 'PayPal payment announced — check in PayPal', cleme_open: "Payment announced into Clémence's account",
+        twin: 'Only one transfer for 2 invoices of {a} (with {other}) — duplicate?', marked_paid: 'Marked "Pagata" but no UBS transfer found',
+        noid_shopify_paid: 'No invoice number, paid according to Shopify (TWINT or card?)', in_delay: 'Sent {d} days ago — within terms',
+        no_payment_days: 'No payment found for {d} days', no_payment_nodate: 'No payment found (unknown date)',
+        free: 'Free', incomplete: 'Incomplete row (client or amount missing)', order_pending: 'Shopify order {o} awaiting payment',
+        order_lower: 'Shopify order found but lower amount ({diff})', paid_shopify: 'Paid via Shopify', paid_transfer: 'Paid by transfer',
+        before_exports: 'Older than the exports loaded', after_event: 'Payment expected after the event — no transfer found',
+        no_trace: 'No Shopify order or transfer found', marked_paid_no_trace: 'Marked paid in the tracker, but no trace in Shopify/UBS',
+        pending_but_paid: 'Transfer received but order still "pending" in Shopify — mark as paid', pending: 'Order awaiting payment ({s})',
+        f_shopify_paid: 'marked paid in Shopify', f_no_order: 'no matching Shopify order',
+        f_group: 'one Shopify order of {a} for {n} vouchers totalling {s}', f_amount: 'order {o} of {a} instead of {b}',
+      }
+    }
+  };
 
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const chf = (n) => n === null || n === undefined || isNaN(n) ? '' : (n < 0 ? '-' : '') + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, "'");
-  const LABEL = { relancer: 'À relancer', verifier: 'À vérifier', fermer: 'Payée · à fermer', ok: 'Payée', info: 'Info', attente: 'Dans le délai' };
+  const fill = (str, p) => String(str).replace(/\{(\w+)\}/g, (_, k) => p && p[k] !== undefined && p[k] !== null ? (typeof p[k] === 'number' && !Number.isInteger(p[k]) || ['a','s','b','diff'].includes(k) && typeof p[k] === 'number' ? chf(p[k]) : p[k]) : '');
+
+  // ---------- langue ----------
+  const LANG_KEY = 'caffesuiso-controle-paiements-lang';
+  let lang = (() => { try { const l = localStorage.getItem(LANG_KEY); if (l && I18N[l]) return l; } catch (e) {} const n = (navigator.language || 'fr').slice(0, 2); return I18N[n] ? n : 'fr'; })();
+  const t = (k, p) => fill((I18N[lang][k] ?? I18N.fr[k] ?? k), p);
+  const tr = (k, p) => fill((I18N[lang].r[k] ?? I18N.fr.r[k] ?? k), p);
+  const why = (r) => tr(r.rk, r.rp);
+  const flagTxt = (f) => tr(f.k, f.p);
+  function applyStatic(){
+    document.documentElement.lang = lang;
+    document.title = t('doc');
+    $$('[data-i18n]').forEach(el => { if (el.closest('.status') && el.dataset.i18n === 'nofile' && el.dataset.loaded) return; el.textContent = t(el.dataset.i18n); });
+    $$('[data-i18n-html]').forEach(el => el.innerHTML = t(el.dataset.i18nHtml));
+    $$('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+    $$('.lang button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+  }
+  $$('.lang button').forEach(b => b.onclick = () => {
+    lang = b.dataset.lang; try { localStorage.setItem(LANG_KEY, lang); } catch (e) {}
+    applyStatic(); renderStatuses(); updateRun();
+    if (state.result) render();
+    if ($('#settings').open) renderSettings();
+  });
 
   // ---------- paramètres ----------
   const CFG_KEY = 'caffesuiso-controle-paiements-v1';
@@ -918,7 +1136,7 @@ function reconcile({ invoices, degust, orders, ubs, config }){
   function saveConfig(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(config)); } catch (e) {} }
 
   // ---------- état ----------
-  const state = { tracker: [], ubs: [], shopify: null, result: null, tab: 'relancer', selected: new Set() };
+  const state = { tracker: [], ubs: [], shopify: null, result: null, tab: 'relancer', selected: new Set(), status: {} };
 
   // ---------- lecture des fichiers ----------
   async function readTracker(file){
@@ -939,28 +1157,26 @@ function reconcile({ invoices, degust, orders, ubs, config }){
 
   function mergeUbs(){
     const files = state.ubs.slice().sort((a, b) => (a.from || '').localeCompare(b.from || ''));
-    const txs = []; let coveredTo = null; const notes = [];
-    let prevEnd = null, chainOk = true, verified = 0;
+    const txs = []; let coveredTo = null;
+    let prevEnd = null, chainOk = true;
     for (const f of files){
-      const keep = f.transactions.filter(t => !coveredTo || t.date > coveredTo);
-      if (keep.length < f.transactions.length) notes.push(`${f.name} : ${f.transactions.length - keep.length} mouvements déjà présents ignorés`);
-      // continuité des soldes entre relevés
+      const keep = f.transactions.filter(x => !coveredTo || x.date > coveredTo);
       const oldest = f.transactions[f.transactions.length - 1];
       if (f.hasBalance && oldest && oldest.balance !== null){
         const before = Math.round((oldest.balance - oldest.amount) * 100) / 100;
         if (prevEnd !== null && keep.length === f.transactions.length && Math.abs(before - prevEnd) > 0.01) chainOk = false;
-        prevEnd = f.transactions[0].balance; verified += f.checked;
+        prevEnd = f.transactions[0].balance;
         if (f.breaks) chainOk = false;
       } else if (prevEnd !== null && f.saldo !== null){
-        const sum = keep.reduce((a, t) => a + t.amount, 0);
-        if (Math.abs(prevEnd + sum - f.saldo) > 0.01) chainOk = false; else verified += keep.length;
+        const sum = keep.reduce((a, x) => a + x.amount, 0);
+        if (Math.abs(prevEnd + sum - f.saldo) > 0.01) chainOk = false;
         prevEnd = f.saldo;
       }
       txs.push(...keep);
       if (f.to && (!coveredTo || f.to > coveredTo)) coveredTo = f.to;
     }
     const owners = [...new Set(files.map(f => f.owner).filter(Boolean))];
-    return { transactions: txs, owners, chainOk, verified, notes, from: files[0] && files[0].from, to: coveredTo };
+    return { transactions: txs, owners, chainOk, from: files[0] && files[0].from, to: coveredTo };
   }
 
   // ---------- zones de dépôt ----------
@@ -971,71 +1187,74 @@ function reconcile({ invoices, degust, orders, ubs, config }){
     zone.addEventListener('dragleave', () => zone.classList.remove('over'));
     zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('over'); handleFiles(kind, [...e.dataTransfer.files]); });
   }
+  // statut de chaque zone, recalculé à chaque changement de langue
+  function renderStatuses(){
+    for (const kind of ['tracker', 'ubs', 'shopify']){
+      const st = $(`[data-status="${kind}"]`), s = state.status[kind];
+      if (!s){ st.textContent = t('nofile'); delete st.dataset.loaded; continue; }
+      st.dataset.loaded = '1';
+      if (s.loading){ st.textContent = t('reading'); continue; }
+      if (s.error){ st.innerHTML = `<span class="err">${esc(t('err_read', { e: s.error }))}</span>`; continue; }
+      if (kind === 'tracker') st.innerHTML = `<span class="okline">${esc(t('st_tracker', { n: s.n, o: s.o }))}</span> · ${esc(t('st_degust', { d: s.d, s: s.sheet || '–' }))}`;
+      if (kind === 'ubs'){
+        st.innerHTML = `<span class="okline">${esc(t('st_ubs', { n: s.n, m: s.m }))}</span><br>${esc(t('fromto', { a: fmtDate(s.from), b: fmtDate(s.to) }))} · ` +
+          (s.chainOk ? `<span class="okline">${esc(t('bal_ok'))}</span>` : `<span class="warn">${esc(t('bal_ko'))}</span>`) + ` <button class="linkbtn" id="clearUbs">${esc(t('clear'))}</button>`;
+        $('#clearUbs').onclick = () => { state.ubs = []; delete state.status.ubs; $('.drop[data-kind=ubs]').classList.remove('loaded'); renderStatuses(); updateRun(); };
+      }
+      if (kind === 'shopify') st.innerHTML = `<span class="okline">${esc(t('st_shop', { n: s.n }))}</span> · ${esc(t('fromto', { a: fmtDate(s.from), b: fmtDate(s.to) }))}` + (s.monthly ? `<br><span class="warn">${esc(t('monthly'))}</span>` : '');
+    }
+  }
   async function handleFiles(kind, files){
     if (!files.length) return;
-    const st = $(`[data-status="${kind}"]`);
-    st.innerHTML = 'Lecture…';
+    state.status[kind] = { loading: true }; renderStatuses();
     try {
       if (kind === 'tracker'){
         state.tracker = [];
         for (const f of files) state.tracker.push(...await readTracker(f));
-        const t = parseTracker(state.tracker);
-        const open = t.invoices.filter(x => x.section === 'open').length;
-        if (!t.invoices.length) throw new Error('aucune facture trouvée (il faut une ligne d’en-tête « Fattura »)');
-        st.innerHTML = `<span class="okline">✓ ${t.invoices.length} factures (${open} ouvertes)</span> · ${t.degust.length} dégustations${t.degustSheet ? ` (onglet « ${esc(t.degustSheet)} »)` : ''}`;
+        const tk = parseTracker(state.tracker);
+        if (!tk.invoices.length) throw new Error(t('err_noinv'));
+        state.status.tracker = { n: tk.invoices.length, o: tk.invoices.filter(x => x.section === 'open').length, d: tk.degust.length, sheet: tk.degustSheet };
       } else if (kind === 'ubs'){
         for (const f of files){ const r = await readUbs(f); state.ubs = state.ubs.filter(u => u.name !== r.name); state.ubs.push(r); }
         const m = mergeUbs();
-        st.innerHTML = `<span class="okline">✓ ${state.ubs.length} relevé(s) · ${m.transactions.length} mouvements</span><br>du ${fmtDate(m.from)} au ${fmtDate(m.to)} · ` +
-          (m.chainOk ? '<span class="okline">soldes vérifiés</span>' : '<span class="warn">soldes à contrôler (relevé manquant ?)</span>') +
-          ` <button class="linkbtn" id="clearUbs">vider</button>`;
-        $('#clearUbs').onclick = () => { state.ubs = []; st.textContent = 'Aucun fichier'; $('.drop[data-kind=ubs]').classList.remove('loaded'); updateRun(); };
+        state.status.ubs = { n: state.ubs.length, m: m.transactions.length, from: m.from, to: m.to, chainOk: m.chainOk };
       } else if (kind === 'shopify'){
         state.shopify = await readShopify(files[0]);
-        const n = state.shopify.orders.length, d = state.shopify.orders.map(o => o.date).filter(Boolean).sort();
-        st.innerHTML = `<span class="okline">✓ ${n} commandes</span> · du ${fmtDate(d[0])} au ${fmtDate(d[d.length - 1])}` + (state.shopify.format === 'mensuel' ? '<br><span class="warn">dates au mois près (ajoute « Day » au rapport pour plus de précision)</span>' : '');
+        const d = state.shopify.orders.map(o => o.date).filter(Boolean).sort();
+        state.status.shopify = { n: state.shopify.orders.length, from: d[0], to: d[d.length - 1], monthly: state.shopify.format === 'mensuel' };
       }
       $(`.drop[data-kind=${kind}]`).classList.add('loaded');
     } catch (e){
       console.error(e);
-      st.innerHTML = `<span class="err">Impossible de lire ce fichier : ${esc(e.message || e)}</span>`;
+      state.status[kind] = { error: e.message || String(e) };
       if (kind === 'tracker') state.tracker = []; if (kind === 'shopify') state.shopify = null;
     }
-    updateRun();
+    renderStatuses(); updateRun();
     if (state.result) run();
   }
   function updateRun(){
     const ready = state.tracker.length && state.ubs.length;
     $('#run').disabled = !ready;
-    $('#runHint').textContent = ready ? (state.shopify ? 'Tout est prêt.' : 'Prêt — sans Shopify, les commandes et dégustations seront moins bien rapprochées.') : 'Charge au moins le tracker et les relevés UBS. Shopify est recommandé.';
+    $('#runHint').textContent = ready ? (state.shopify ? t('h_ready') : t('h_noshop')) : t('h_notready');
   }
-  $('#run').onclick = run;
+  $('#run').onclick = () => { run(); $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
 
   // ---------- contrôle ----------
   function run(){
-    const t = parseTracker(state.tracker);
+    const tk = parseTracker(state.tracker);
     const m = mergeUbs();
     const orders = state.shopify ? state.shopify.orders : [];
-    state.result = reconcile({ invoices: t.invoices, degust: t.degust, orders, ubs: m, config });
+    state.result = reconcile({ invoices: tk.invoices, degust: tk.degust, orders, ubs: m, config });
     state.result.ubsMeta = m;
-    state.knownNames = [...new Set([...t.invoices.map(x => x.client), ...t.degust.map(d => d.client), ...orders.map(o => o.customer), ...m.transactions.filter(x => x.amount > 0).map(x => x.counterparty)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    $('#knownNames').innerHTML = state.knownNames.map(n => `<option value="${esc(n)}">`).join('');
+    const names = [...new Set([...tk.invoices.map(x => x.client), ...tk.degust.map(d => d.client), ...orders.map(o => o.customer), ...m.transactions.filter(x => x.amount > 0).map(x => x.counterparty)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    $('#knownNames').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
     state.selected.clear();
     $('#results').hidden = false;
     render();
-    $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ---------- onglets ----------
-  const TABS = [
-    { id: 'relancer', label: 'À relancer', note: 'Aucun paiement trouvé après le délai. La date « approx. » vient du libellé de la facture ou de la commande Shopify.' },
-    { id: 'verifier', label: 'À vérifier', note: 'Cas ambigus : écart de montant, PayPal, doublon possible, ligne incomplète, statut Shopify à corriger…' },
-    { id: 'fermer', label: 'À fermer', note: 'Factures encore « Opened » dans le tracker alors que le virement est arrivé.' },
-    { id: 'clients', label: 'Clients par virement', note: 'Clients qui paient par virement : commandes Shopify sans virement correspondant (plus anciennes que le délai). Indicatif — certaines ont pu être payées par TWINT ou carte.' },
-    { id: 'nonid', label: 'Virements non identifiés', note: 'Virements reçus qu’aucune facture ni commande n’explique. « Associer » crée un alias, « Ignorer » les retire du contrôle.' },
-    { id: 'degust', label: 'Dégustations', note: 'Bons et dégustations du tracker, rapprochés avec Shopify (email, nom, montant) puis UBS.' },
-    { id: 'factures', label: 'Toutes les factures', note: 'Toutes les factures du tracker avec leur statut calculé.' },
-  ];
+  const TABS = [['relancer', 'rel'], ['verifier', 'ver'], ['fermer', 'fer'], ['clients', 'cli'], ['nonid', 'non'], ['degust', 'deg'], ['factures', 'fac']];
   function tabRows(id){
     const R = state.result;
     if (id === 'relancer') return R.rows.filter(r => r.statut === 'relancer').sort((a, b) => (b.age ?? -1) - (a.age ?? -1));
@@ -1043,103 +1262,110 @@ function reconcile({ invoices, degust, orders, ubs, config }){
     if (id === 'fermer') return R.rows.filter(r => r.statut === 'fermer');
     if (id === 'clients') return R.ledger.filter(l => l.sansVirement.length);
     if (id === 'nonid') return R.unidentified;
-    if (id === 'degust') return R.rows.filter(r => r.type === 'Dégustation');
-    if (id === 'factures') return R.rows.filter(r => r.type === 'Facture');
+    if (id === 'degust') return R.rows.filter(r => r.type === 'degust');
+    if (id === 'factures') return R.rows.filter(r => r.type === 'facture');
     return [];
   }
 
   function render(){
-    const R = state.result;
-    const m = R.ubsMeta;
-    $('#asof').innerHTML = `Situation au <b>${fmtDate(R.asOf)}</b> (dernier mouvement UBS) · relevés du ${fmtDate(m.from)} au ${fmtDate(m.to)}` +
-      (m.chainOk ? '' : ' · <span style="color:var(--verifier)">soldes non continus : un relevé manque peut-être</span>');
+    const R = state.result, m = R.ubsMeta;
+    $('#asof').innerHTML = t('asof', { d: fmtDate(R.asOf), a: fmtDate(m.from), b: fmtDate(m.to) }) + (m.chainOk ? '' : ` · <span style="color:var(--verifier)">${esc(t('chain_ko'))}</span>`);
     const sum = (rows) => rows.reduce((a, r) => a + (r.montant || 0), 0);
     const rel = tabRows('relancer'), ver = tabRows('verifier'), fer = tabRows('fermer'), cli = tabRows('clients'), non = tabRows('nonid');
     $('#kpis').innerHTML = [
-      ['relancer', rel.length, 'à relancer', `CHF ${chf(sum(rel))}`],
-      ['verifier', ver.length, 'à vérifier', ''],
-      ['fermer', fer.length, 'payées, à fermer', `CHF ${chf(sum(fer))}`],
-      ['clients', cli.reduce((a, l) => a + l.sansVirement.length, 0), 'commandes sans virement', `CHF ${chf(cli.reduce((a, l) => a + l.montantSansVirement, 0))}`],
-      ['nonid', non.length, 'virements non identifiés', `CHF ${chf(sum(non))}`],
-    ].map(([id, n, l, s]) => `<button class="kpi ${id}" data-tab="${id}"><div class="n">${n}</div><div class="l">${l}</div>${s ? `<div class="s">${s}</div>` : ''}</button>`).join('');
+      ['relancer', rel.length, t('k_rel'), `CHF ${chf(sum(rel))}`],
+      ['verifier', ver.length, t('k_ver'), ''],
+      ['fermer', fer.length, t('k_fer'), `CHF ${chf(sum(fer))}`],
+      ['clients', cli.reduce((a, l) => a + l.sansVirement.length, 0), t('k_cli'), `CHF ${chf(cli.reduce((a, l) => a + l.montantSansVirement, 0))}`],
+      ['nonid', non.length, t('k_non'), `CHF ${chf(sum(non))}`],
+    ].map(([id, n, l, s]) => `<button class="kpi ${id}" data-tab="${id}"><div class="n">${n}</div><div class="l">${esc(l)}</div>${s ? `<div class="s">${s}</div>` : ''}</button>`).join('');
     $$('.kpi').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
-    $('#tabs').innerHTML = TABS.map(t => `<button class="tab" role="tab" data-tab="${t.id}" aria-selected="${t.id === state.tab}">${t.label}<span class="c">${tabRows(t.id).length}</span></button>`).join('');
+    $('#tabs').innerHTML = TABS.map(([id, k]) => `<button class="tab" role="tab" data-tab="${id}" aria-selected="${id === state.tab}">${esc(t('t_' + k))}<span class="c">${tabRows(id).length}</span></button>`).join('');
     $$('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; render(); });
-    $('#tabnote').textContent = TABS.find(t => t.id === state.tab).note;
+    $('#tabnote').textContent = t('n_' + TABS.find(([id]) => id === state.tab)[1]);
     $('#copySel').hidden = state.tab !== 'relancer';
     renderTable();
   }
 
-  const pill = (st) => `<span class="pill ${st}">${LABEL[st] || st}</span>`;
-  const dateCell = (r) => r.date ? `${fmtDate(r.date)}${r.dateApprox ? '<span class="sub">approx.</span>' : ''}` : '<span class="sub">inconnue</span>';
-  const flags = (r) => (r.flags || []).map(f => `<span class="flag">⚑ ${esc(f)}</span>`).join('<br>');
-  const ref = (r) => r.type === 'Facture' ? `${esc(r.ref)}` : r.type === 'Commande Shopify' ? `Shopify ${esc(r.ref)}` : `<span class="sub" style="margin:0">${esc(r.ref)}</span>`;
+  const STATUS_KEY = { relancer: 's_relancer', verifier: 's_verifier', fermer: 's_fermer', ok: 's_ok', info: 's_info', attente: 's_attente' };
+  const statusLabel = (st) => t(STATUS_KEY[st] || st);
+  const pill = (st) => `<span class="pill ${st}">${esc(statusLabel(st))}</span>`;
+  const typeLabel = (ty) => t('ty_' + ty);
+  const clientOf = (r) => r.client || t('noname');
+  const payText = (r) => (r.pays || []).map(p => `${fmtDate(p.date)} · ${p.from}${p.groupe ? t('pay_group', { n: p.groupe }) : ''}${p.ecart ? t('pay_diff', { d: (p.ecart > 0 ? '+' : '') + chf(p.ecart) }) : ''}`).join(' + ');
+  const shopText = (r) => r.shopify || (r.shopifyMark ? t('trk', { v: r.shopifyMark }) : '');
+  const noteText = (r) => [r.note, r.link ? t(r.link.kind === 'facture' ? 'linked_f' : 'linked_d', { r: r.link.ref }) : '', ...(r.type === 'degust' ? (r.flags || []).map(flagTxt) : [])].filter(Boolean).join(' · ');
+  const flagsHtml = (r) => r.type === 'degust' ? '' : (r.flags || []).map(f => `<span class="flag">⚑ ${esc(flagTxt(f))}</span>`).join('<br>');
+  const dateCell = (r) => r.date ? `${fmtDate(r.date)}${r.dateApprox ? `<span class="sub">${esc(t('approx'))}</span>` : ''}` : `<span class="sub">${esc(t('unknown'))}</span>`;
+  const refHtml = (r) => r.type === 'facture' ? esc(r.ref) : r.type === 'commande' ? `Shopify ${esc(r.ref)}` : `<span class="sub" style="margin:0">${esc(r.ref)}</span>`;
+  const subOr = (v) => v ? esc(v) : '<span class="sub">—</span>';
 
   function columns(id){
     if (id === 'relancer') return [
       { h: '', w: r => `<input type="checkbox" class="sel" data-k="${esc(rowKey(r))}" ${state.selected.has(rowKey(r)) ? 'checked' : ''}>` },
-      { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
-      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
-      { h: 'Jours', c: 'num', w: r => r.age ?? '', t: r => r.age }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
-      { h: 'Email', w: r => r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : '<span class="sub">—</span>', t: r => r.email },
-      { h: 'Pourquoi', w: r => esc(r.raison) + (r.note ? `<span class="sub">Note : ${esc(r.note)}</span>` : ''), t: r => r.raison },
+      { h: t('col_inv'), w: refHtml, t: r => r.ref }, { h: t('col_client'), w: r => esc(clientOf(r)) + flagsHtml(r), t: clientOf },
+      { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: t('col_date'), c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: t('col_days'), c: 'num', w: r => r.age ?? '', t: r => r.age }, { h: 'Shopify', w: r => esc(shopText(r)), t: shopText },
+      { h: t('col_email'), w: r => r.email ? `<a href="mailto:${esc(r.email)}">${esc(r.email)}</a>` : '<span class="sub">—</span>', t: r => r.email },
+      { h: t('col_why'), w: r => esc(why(r)) + (noteText(r) ? `<span class="sub">${esc(t('note'))}${esc(noteText(r))}</span>` : ''), t: why },
     ];
     if (id === 'verifier') return [
-      { h: 'Type', w: r => esc(r.type), t: r => r.type }, { h: 'Réf.', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
-      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
-      { h: 'Pourquoi', w: r => `<b>${esc(r.raison)}</b>` + (r.note ? `<span class="sub">${esc(r.note)}</span>` : ''), t: r => r.raison },
-      { h: 'Paiement trouvé', w: r => esc(r.paiement) || '<span class="sub">—</span>', t: r => r.paiement },
-      { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+      { h: t('col_type'), w: r => esc(typeLabel(r.type)), t: r => typeLabel(r.type) }, { h: t('col_ref'), w: refHtml, t: r => r.ref },
+      { h: t('col_client'), w: r => esc(clientOf(r)) + flagsHtml(r), t: clientOf },
+      { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: t('col_date'), c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: t('col_why'), w: r => `<b>${esc(why(r))}</b>` + (noteText(r) ? `<span class="sub">${esc(noteText(r))}</span>` : ''), t: why },
+      { h: t('col_payfound'), w: r => subOr(payText(r)), t: payText }, { h: 'Shopify', w: r => esc(shopText(r)), t: shopText },
     ];
     if (id === 'fermer') return [
-      { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client), t: r => r.client },
-      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date facture', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
-      { h: 'Virement reçu', w: r => esc(r.paiement), t: r => r.paiement }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
+      { h: t('col_inv'), w: refHtml, t: r => r.ref }, { h: t('col_client'), w: r => esc(clientOf(r)), t: clientOf },
+      { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: t('col_invdate'), c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: t('col_received'), w: r => esc(payText(r)), t: payText }, { h: 'Shopify', w: r => esc(shopText(r)), t: shopText },
     ];
     if (id === 'clients') return [
-      { h: 'Payeur (UBS)', w: l => esc(l.payeur), t: l => l.payeur }, { h: 'Client(s) Shopify', w: l => esc(l.clientsShopify.join(', ')), t: l => l.clientsShopify.join(', ') },
-      { h: 'Virements reçus', c: 'num', w: l => `${chf(l.recu)}<span class="sub">${l.nbVirements} virement(s)</span>`, t: l => l.recu },
-      { h: 'Commandé', c: 'num', w: l => `${chf(l.commande)}<span class="sub">${l.commandes} commande(s)</span>`, t: l => l.commande },
-      { h: 'Sans virement', c: 'num', w: l => `<b>${chf(l.montantSansVirement)}</b><span class="sub">${l.sansVirement.length} commande(s)</span>`, t: l => l.montantSansVirement },
-      { h: 'Détail', w: l => `<details><summary>voir</summary><ul>${l.sansVirement.map(o => `<li>${esc(o.name)} · ${fmtDate(o.date)} · CHF ${chf(o.amount)}</li>`).join('')}</ul></details>`, t: l => l.sansVirement.map(o => `${o.name} ${fmtDate(o.date)} ${o.amount}`).join(' | ') },
-      { h: 'Dernier virement', c: 'nowrap', w: l => fmtDate(l.dernier), t: l => fmtDate(l.dernier) },
+      { h: t('col_payer'), w: l => esc(l.payeur), t: l => l.payeur }, { h: t('col_shopcli'), w: l => esc(l.clientsShopify.join(', ')), t: l => l.clientsShopify.join(', ') },
+      { h: t('col_recv'), c: 'num', w: l => `${chf(l.recu)}<span class="sub">${esc(t('n_tr', { n: l.nbVirements }))}</span>`, t: l => l.recu },
+      { h: t('col_ordered'), c: 'num', w: l => `${chf(l.commande)}<span class="sub">${esc(t('n_ord', { n: l.commandes }))}</span>`, t: l => l.commande },
+      { h: t('col_notr'), c: 'num', w: l => `<b>${chf(l.montantSansVirement)}</b><span class="sub">${esc(t('n_ord', { n: l.sansVirement.length }))}</span>`, t: l => l.montantSansVirement },
+      { h: t('col_detail'), w: l => `<details><summary>${esc(t('see'))}</summary><ul>${l.sansVirement.map(o => `<li>${esc(o.name)} · ${fmtDate(o.date)} · CHF ${chf(o.amount)}</li>`).join('')}</ul></details>`, t: l => l.sansVirement.map(o => `${o.name} ${fmtDate(o.date)} ${o.amount}`).join(' | ') },
+      { h: t('col_last'), c: 'nowrap', w: l => fmtDate(l.dernier), t: l => fmtDate(l.dernier) },
     ];
     if (id === 'nonid') return [
-      { h: 'Date', c: 'nowrap', w: u => fmtDate(u.date), t: u => fmtDate(u.date) }, { h: 'Émetteur', w: u => esc(u.de), t: u => u.de },
-      { h: 'Montant', c: 'num', w: u => chf(u.montant), t: u => u.montant }, { h: 'Libellé', w: u => esc(u.libelle), t: u => u.libelle },
-      { h: '', w: u => `<button class="linkbtn assocBtn" data-name="${esc(u.de)}">Associer à un client</button> · <button class="linkbtn ignoreBtn" data-name="${esc(u.de)}">Ignorer</button>` },
+      { h: t('col_date'), c: 'nowrap', w: u => fmtDate(u.date), t: u => fmtDate(u.date) }, { h: t('col_sender'), w: u => esc(u.de), t: u => u.de },
+      { h: t('col_amount'), c: 'num', w: u => chf(u.montant), t: u => u.montant }, { h: t('col_label'), w: u => esc(u.libelle), t: u => u.libelle },
+      { h: '', w: u => `<button class="linkbtn assocBtn" data-name="${esc(u.de)}">${esc(t('link'))}</button> · <button class="linkbtn ignoreBtn" data-name="${esc(u.de)}">${esc(t('ignore'))}</button>` },
     ];
     if (id === 'degust') return [
-      { h: 'Statut', w: r => pill(r.statut), t: r => LABEL[r.statut] }, { h: 'Client', w: r => esc(r.client), t: r => r.client },
-      { h: 'Détails', w: r => `<span class="sub" style="margin:0">${esc(r.ref)}</span>`, t: r => r.ref }, { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant },
-      { h: 'Date', c: 'nowrap', w: r => fmtDate(r.date), t: r => fmtDate(r.date) }, { h: 'Shopify', w: r => esc(r.shopify), t: r => r.shopify },
-      { h: 'Pourquoi', w: r => esc(r.raison) + (r.note ? `<span class="sub">${esc(r.note)}</span>` : ''), t: r => r.raison },
+      { h: t('col_status'), w: r => pill(r.statut), t: r => statusLabel(r.statut) }, { h: t('col_client'), w: r => esc(clientOf(r)), t: clientOf },
+      { h: t('col_details'), w: r => `<span class="sub" style="margin:0">${esc(r.ref)}</span>`, t: r => r.ref }, { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant },
+      { h: t('col_date'), c: 'nowrap', w: r => fmtDate(r.date), t: r => fmtDate(r.date) }, { h: 'Shopify', w: r => esc(shopText(r)), t: shopText },
+      { h: t('col_why'), w: r => esc(why(r)) + (noteText(r) ? `<span class="sub">${esc(noteText(r))}</span>` : ''), t: why },
     ];
     return [
-      { h: 'Statut', w: r => pill(r.statut), t: r => LABEL[r.statut] }, { h: 'Facture', w: r => ref(r), t: r => r.ref }, { h: 'Client', w: r => esc(r.client) + flags(r), t: r => r.client },
-      { h: 'Montant', c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: 'Date', c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) }, { h: 'Tracker', w: r => esc(r.tracker), t: r => r.tracker },
-      { h: 'Paiement', w: r => esc(r.paiement) || '<span class="sub">—</span>', t: r => r.paiement }, { h: 'Pourquoi', w: r => esc(r.raison), t: r => r.raison },
+      { h: t('col_status'), w: r => pill(r.statut), t: r => statusLabel(r.statut) }, { h: t('col_inv'), w: refHtml, t: r => r.ref },
+      { h: t('col_client'), w: r => esc(clientOf(r)) + flagsHtml(r), t: clientOf },
+      { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: t('col_date'), c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
+      { h: t('col_tracker'), w: r => esc(r.tracker), t: r => r.tracker },
+      { h: t('col_payment'), w: r => subOr(payText(r)), t: payText }, { h: t('col_why'), w: r => esc(why(r)), t: why },
     ];
   }
   const rowKey = (r) => [r.type, r.ref, r.client, r.montant, r.date].join('|');
 
   function filtered(){
     const q = deaccent($('#filter').value.trim().toLowerCase());
-    const cols = columns(state.tab);
-    const rows = tabRows(state.tab);
+    const cols = columns(state.tab), rows = tabRows(state.tab);
     if (!q) return rows;
     return rows.filter(r => cols.some(c => c.t && deaccent(String(c.t(r) ?? '').toLowerCase()).includes(q)));
   }
   function renderTable(){
     const cols = columns(state.tab), rows = filtered();
-    if (!rows.length){ $('#table').innerHTML = `<div class="empty">${$('#filter').value ? 'Aucun résultat pour ce filtre.' : 'Rien ici. 👌'}</div>`; return; }
-    $('#table').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.c || ''}">${c.h}</th>`).join('')}</tr></thead><tbody>` +
+    if (!rows.length){ $('#table').innerHTML = `<div class="empty">${esc($('#filter').value ? t('nores') : t('empty'))}</div>`; return; }
+    $('#table').innerHTML = `<table><thead><tr>${cols.map(c => `<th class="${c.c || ''}">${esc(c.h)}</th>`).join('')}</tr></thead><tbody>` +
       rows.map(r => `<tr>${cols.map(c => `<td class="${c.c || ''}">${c.w(r)}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
     $$('.sel').forEach(cb => cb.onchange = () => { cb.checked ? state.selected.add(cb.dataset.k) : state.selected.delete(cb.dataset.k); });
     $$('.ignoreBtn').forEach(b => b.onclick = () => { if (!config.ignorer.includes(b.dataset.name)) config.ignorer.push(b.dataset.name); saveConfig(); run(); });
     $$('.assocBtn').forEach(b => b.onclick = () => {
       const td = b.parentElement; if ($('.assoc', td)) return;
-      td.insertAdjacentHTML('beforeend', `<div class="assoc"><input list="knownNames" placeholder="Client (tracker ou Shopify)"><button class="btn ghost small">OK</button></div>`);
+      td.insertAdjacentHTML('beforeend', `<div class="assoc"><input list="knownNames" placeholder="${esc(t('link_ph'))}"><button class="btn ghost small">${esc(t('ok'))}</button></div>`);
       const inp = $('.assoc input', td); inp.focus();
       $('.assoc button', td).onclick = () => { const v = inp.value.trim(); if (!v) return; config.alias.push({ de: v, vers: b.dataset.name }); saveConfig(); run(); };
     });
@@ -1159,23 +1385,23 @@ function reconcile({ invoices, degust, orders, ubs, config }){
   };
   $('#exportAll').onclick = () => {
     const R = state.result;
-    const hdr = ['Statut', 'Type', 'Réf.', 'Client', 'Montant', 'Date', 'Date approx.', 'Jours', 'Pourquoi', 'Paiement trouvé', 'Shopify', 'Email', 'Tracker', 'Note'];
-    const rows = R.rows.map(r => [LABEL[r.statut], r.type, r.ref, r.client, r.montant, fmtDate(r.date), r.dateApprox ? 'oui' : '', r.age, r.raison, r.paiement, r.shopify, r.email, r.tracker, [r.note, ...(r.flags || [])].filter(Boolean).join(' · ')]);
-    for (const u of R.unidentified) rows.push(['Non identifié', 'Virement UBS', '', u.de, u.montant, fmtDate(u.date), '', '', 'Virement sans facture ni commande correspondante', '', '', '', '', u.libelle]);
+    const hdr = [t('col_status'), t('col_type'), t('col_ref'), t('col_client'), t('col_amount'), t('col_date'), t('col_approx'), t('col_days'), t('col_why'), t('col_payfound'), 'Shopify', t('col_email'), t('col_tracker'), t('col_note')];
+    const rows = R.rows.map(r => [statusLabel(r.statut), typeLabel(r.type), r.ref, clientOf(r), r.montant, fmtDate(r.date), r.dateApprox ? t('yes') : '', r.age, why(r), payText(r), shopText(r), r.email, r.tracker, [noteText(r), ...(r.type === 'degust' ? [] : (r.flags || []).map(flagTxt))].filter(Boolean).join(' · ')]);
+    for (const u of R.unidentified) rows.push([t('s_nonid'), t('ty_ubs'), '', u.de, u.montant, fmtDate(u.date), '', '', t('nonid_why'), '', '', '', '', u.libelle]);
     download(`controle-paiements-${R.asOf}.csv`, toCsv(hdr, rows), 'text/csv');
   };
   $('#copySel').onclick = async () => {
-    const rows = tabRows('relancer').filter(r => state.selected.has(rowKey(r)));
-    const list = (rows.length ? rows : tabRows('relancer')).map(r => `- ${r.client} — ${r.type === 'Facture' ? 'facture ' + r.ref : r.type + ' ' + r.ref} — CHF ${chf(r.montant)} — ${r.date ? fmtDate(r.date) : 'date inconnue'}${r.email ? ' — ' + r.email : ''}`).join('\n');
-    try { await navigator.clipboard.writeText(list); $('#copySel').textContent = `Copié (${rows.length || tabRows('relancer').length})`; }
-    catch (e){ prompt('Copie ce texte :', list); }
-    setTimeout(() => { $('#copySel').textContent = 'Copier la sélection pour les relances'; }, 2000);
+    const all = tabRows('relancer'), rows = all.filter(r => state.selected.has(rowKey(r)));
+    const list = (rows.length ? rows : all).map(r => `- ${clientOf(r)} — ${r.type === 'facture' ? t('cp_inv', { r: r.ref }) : typeLabel(r.type) + ' ' + r.ref} — CHF ${chf(r.montant)} — ${r.date ? fmtDate(r.date) : t('cp_nodate')}${r.email ? ' — ' + r.email : ''}`).join('\n');
+    try { await navigator.clipboard.writeText(list); $('#copySel').textContent = t('copied', { n: (rows.length || all.length) }); }
+    catch (e){ prompt(t('copy_prompt'), list); }
+    setTimeout(() => { $('#copySel').textContent = t('copySel'); }, 2000);
   };
 
   // ---------- fenêtre paramètres ----------
   function renderSettings(){
-    $('#aliasList').innerHTML = config.alias.length ? config.alias.map((a, i) => `<div class="item"><span>${esc(a.de)} <b>=</b> ${esc(a.vers)}</span><button type="button" class="x" data-i="${i}" title="Supprimer">×</button></div>`).join('') : '<p class="muted">Aucun alias.</p>';
-    $('#ignoreList').innerHTML = config.ignorer.length ? config.ignorer.map((n, i) => `<div class="item"><span>${esc(n)}</span><button type="button" class="x" data-j="${i}" title="Supprimer">×</button></div>`).join('') : '<p class="muted">Aucun.</p>';
+    $('#aliasList').innerHTML = config.alias.length ? config.alias.map((a, i) => `<div class="item"><span>${esc(a.de)} <b>=</b> ${esc(a.vers)}</span><button type="button" class="x" data-i="${i}" title="${esc(t('del'))}">×</button></div>`).join('') : `<p class="muted">${esc(t('s_noalias'))}</p>`;
+    $('#ignoreList').innerHTML = config.ignorer.length ? config.ignorer.map((n, i) => `<div class="item"><span>${esc(n)}</span><button type="button" class="x" data-j="${i}" title="${esc(t('del'))}">×</button></div>`).join('') : `<p class="muted">${esc(t('s_none'))}</p>`;
     $('#delai').value = config.delaiRelance;
     $$('#aliasList .x').forEach(b => b.onclick = () => { config.alias.splice(+b.dataset.i, 1); saveConfig(); renderSettings(); });
     $$('#ignoreList .x').forEach(b => b.onclick = () => { config.ignorer.splice(+b.dataset.j, 1); saveConfig(); renderSettings(); });
@@ -1189,9 +1415,11 @@ function reconcile({ invoices, degust, orders, ubs, config }){
   $('#importCfg').onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
     try { const c = JSON.parse(await f.text()); config = { ...DEFAULT_CFG, ...c, alias: c.alias || [], ignorer: c.ignorer || [] }; saveConfig(); renderSettings(); }
-    catch (err){ alert('Fichier de paramètres illisible.'); }
+    catch (err){ alert(t('s_bad')); }
     e.target.value = '';
   };
+
+  applyStatic(); updateRun();
 })();
 
 </script>

@@ -172,6 +172,8 @@ tr.row-alerte td{background:var(--relancer-bg)}
 @media (max-width:900px){ .files.two{grid-template-columns:1fr} }
 .settings.over{outline:2px dashed var(--accent);outline-offset:-8px}
 
+.query-body{margin:0;padding:12px;font-size:13.5px;background:var(--surface)}
+
 </style>
 </head>
 <body>
@@ -230,6 +232,10 @@ tr.row-alerte td{background:var(--relancer-bg)}
   SINCE 2025-01-01 UNTIL today
   ORDER BY day ASC
   LIMIT 10000</pre>
+      </div>
+      <div class="query">
+        <div class="query-head"><b data-i18n="q3_t"></b></div>
+        <p class="query-body" data-i18n-html="q3_h"></p>
       </div>
       <p class="muted" data-i18n-html="howto_tags"></p>
     </div>
@@ -1016,7 +1022,11 @@ function pickKey(keys, ...cands){ const m = new Map(keys.map(k => [nk(k), k])); 
 function readShopifyCsv(rows){
   if (!rows.length) return { kind: null, rows: [] };
   const keys = Object.keys(rows[0]);
-  const kOrder = pickKey(keys, 'order_name', 'Order name', 'Name', 'Commande');
+  const kOrder = pickKey(keys, 'order_name', 'Order name', 'Name', 'Commande', 'Draft order', 'Draft order name', 'Draft', 'Brouillon', 'Bozza');
+  if (kOrder){
+    const sample = rows.slice(0, 60).map(r => cellStr(r[kOrder])).filter(Boolean);
+    if (sample.length && sample.filter(isDraftName).length >= sample.length * 0.8) return readDraftsCsv(rows, keys, kOrder);
+  }
   const kGw = pickKey(keys, 'payment_gateway', 'Payment gateway', 'Passerelle de paiement', 'Gateway di pagamento');
   const kStatus = pickKey(keys, 'order_payment_status', 'Order payment status', 'Financial Status');
   if (!kOrder) throw new Error('order_name');
@@ -1038,6 +1048,38 @@ function readShopifyCsv(rows){
   return { kind: kGw ? 'paiements' : (kStatus ? 'commandes' : null), rows: out };
 }
 
+// Export « Brouillons » de Shopify (Commandes → Brouillons → Exporter) : une ligne par article, totaux répétés ou sur la 1re ligne
+const isDraftName = (n) => /^#?D\d+$/i.test(String(n || '').trim());
+function readDraftsCsv(rows, keys, kOrder){
+  const kSt = pickKey(keys, 'Status', 'Statut', 'Stato', 'Draft status', 'Draft order status', 'status');
+  const kCust = pickKey(keys, 'customer_name', 'Customer name', 'Customer', 'Client', 'Cliente', 'Billing Name', 'Shipping Name');
+  const kEmail = pickKey(keys, 'customer_email', 'Customer email', 'Email', 'E-mail');
+  const kTags = pickKey(keys, 'Tags', 'Tag', 'Draft order tags');
+  const kDay = pickKey(keys, 'Created at', 'Created At', 'created_at', 'Date', 'Creation date', 'Day');
+  const kSent = pickKey(keys, 'Invoice sent at', 'Invoice Sent At', 'invoice_sent_at');
+  const kDone = pickKey(keys, 'Completed at', 'Completed At', 'completed_at');
+  const kAmt = pickKey(keys, 'Total', 'Total price', 'Total Price', 'total_price', 'Amount', 'Montant', 'Importo');
+  const map = new Map();
+  for (const r of rows){
+    const name = cellStr(r[kOrder]); if (!isDraftName(name)) continue;
+    let d = map.get(name);
+    if (!d){ d = { name: name.startsWith('#') ? name : '#' + name, customer: '', email: '', tags: [], date: null, amount: 0, status: '', sent: false, completed: false }; map.set(name, d); }
+    if (!d.customer && kCust) d.customer = cellStr(r[kCust]).replace(/\s+/g, ' ');
+    if (!d.email && kEmail) d.email = cellStr(r[kEmail]).toLowerCase();
+    if (kTags) for (const t of cellStr(r[kTags]).split(/[,;|]/).map(x => x.trim()).filter(Boolean)) if (!d.tags.includes(t)) d.tags.push(t);
+    const dt = kDay ? parseDateCell(r[kDay]) : null; if (dt && (!d.date || dt < d.date)) d.date = dt;
+    const a = kAmt ? (parseAmount(r[kAmt]) || 0) : 0; if (a > d.amount) d.amount = a;
+    if (kSt && cellStr(r[kSt])) d.status = deaccent(cellStr(r[kSt]).toLowerCase());
+    if (kSent && cellStr(r[kSent])) d.sent = true;
+    if (kDone && cellStr(r[kDone])) d.completed = true;
+  }
+  for (const d of map.values()){
+    if (/invoice|factur|fattura|envoy|inviat|sent/.test(d.status)) d.sent = true;
+    if (/complet|termin|conclu/.test(d.status)) d.completed = true;
+  }
+  return { kind: 'brouillons', rows: [...map.values()] };
+}
+
 // Le rapport groupé par « order_tag » répète une même ligne une fois par tag : on fusionne les doublons
 function mergeTagRows(rows){
   const m = new Map();
@@ -1050,7 +1092,7 @@ function mergeTagRows(rows){
   return [...m.values()];
 }
 
-function reconcileV2({ payRows, orderRows, ubs, config }){
+function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
   config = config || {};
   payRows = mergeTagRows(payRows); orderRows = mergeTagRows(orderRows);
   const delai = config.delaiRelance || 30;
@@ -1092,6 +1134,13 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     if (manual > 0.05) items.push({ o, amount: manual, kind: 'manual', gateways: Object.keys(o.byGw).filter(g => !PROC_FAMILY(g)) });
     if (due > 0.05) items.push({ o, amount: due, kind: 'pending', gateways: [] });
   }
+  // brouillons encore ouverts (pas encore devenus des commandes)
+  // le nom de facturation d'un brouillon peut différer du client Shopify (« Papi ») : on reprend le client des commandes ayant le même email
+  const byEmail = new Map(); for (const o of orders) if (o.email && o.customer && !byEmail.has(o.email)) byEmail.set(o.email, o.customer);
+  const drafts = (draftRows || []).filter(d => !d.completed && d.amount > 0.05).map(d => ({ name: d.name, customer: byEmail.get(d.email) || d.customer, billing: d.customer, email: d.email, tags: d.tags || [], byGw: {}, paid: 0,
+    orderDate: d.date, payDate: null, date: d.date, status: d.sent ? 'draft_sent' : 'draft_open', sent: d.sent, total: d.amount, isDraft: true,
+    match: [...new Set([byEmail.get(d.email), d.customer, emailDomainName(d.email)].filter(Boolean))].join(' ') }));
+  for (const d of drafts) items.push({ o: d, amount: d.total, kind: 'draft', gateways: [] });
   for (const it of items){ it.payments = []; it.offTag = it.o.tags.find(t => tagsOff.includes(deaccent(t.toLowerCase()))) || null; }
 
   // ---------- UBS ----------
@@ -1102,8 +1151,20 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   const ubsStart = txs.reduce((m, t) => !m || t.date < m ? t.date : m, null);
   const asOf = txs.reduce((m, t) => !m || t.date > m ? t.date : m, null);
 
-  for (const o of orders) { idx.addName(o.customer); const d = emailDomainName(o.email); if (d) idx.addName(d); }
+  for (const o of orders.concat(drafts)) { idx.addName(o.customer); const d = emailDomainName(o.email); if (d) idx.addName(d); }
   for (const c of credits) idx.addName(c.counterparty);
+
+  // brouillon en double : même client, même montant, commande créée entre 3 jours avant et 45 jours après
+  const usedOrd = new Set();
+  for (const it of items.filter(x => x.kind === 'draft')){
+    const d = it.o; if (!d.match || !d.date) continue;
+    const lo = addDays(d.date, -3), hi = addDays(d.date, 45);
+    const dist = (o) => Math.min(...[o.orderDate, o.payDate].filter(x => x && x >= lo && x <= hi).map(x => Math.abs(daysBetween(d.date, x))), Infinity);
+    const c = orders.filter(o => !usedOrd.has(o.name) && o.match && dist(o) < Infinity
+        && Math.abs((o.total !== null ? o.total : o.paid) - d.total) <= 0.05 && ((d.email && o.email === d.email) || idx.score(d.match, o.match) >= STRONG))
+      .sort((a, b) => dist(a) - dist(b));
+    if (c.length){ const o = c[0]; it.replacedBy = { name: o.name, date: [o.orderDate, o.payDate].filter(x => x && x >= lo && x <= hi).sort((x, y) => Math.abs(daysBetween(d.date, x)) - Math.abs(daysBetween(d.date, y)))[0] }; usedOrd.add(o.name); }
+  }
 
   // ---------- rapprochement virement ↔ commande(s) (premier arrivé, premier servi) ----------
   // 1er passage : commandes sans tag. 2e passage : commandes taguées, sur les virements restants.
@@ -1120,8 +1181,8 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     if (!pick){ const tol = cands.filter(e => e.s >= STRONG && e.it.amount >= 20 && Math.abs(e.it.amount - c.amount) <= Math.max(1, e.it.amount * 0.12) && Math.abs(daysBetween(e.it.o.date, c.date)) <= 90).sort(byAge); if (tol.length){ pick = [tol[0].it]; ecart = true; } }
     if (pick) for (const it of pick){ it.payments.push({ date: c.date, from: c.counterparty, amount: c.amount, groupe: pick.length > 1 ? pick.length : 0, ecart: ecart ? round2(c.amount - it.amount) : 0 }); c.usedBy.push(it.o.name); }
   } };
-  matchPass(items.filter(it => !it.offTag));
-  matchPass(items.filter(it => it.offTag));
+  matchPass(items.filter(it => !it.offTag && !it.replacedBy));
+  matchPass(items.filter(it => it.offTag && !it.replacedBy));
 
   // ---------- statuts ----------
   const age = (d) => d && asOf ? daysBetween(d, asOf) : null;
@@ -1132,7 +1193,18 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     const set = (statut, rk, rp) => { r.statut = statut; r.rk = rk; r.rp = rp || {}; };
     const paid = it.payments.length > 0, ecart = it.payments.some(p => p.ecart);
     const debut = config.debutControle || null;
-    if (it.offTag && !paid) set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
+    const tagInfo = () => set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
+    if (it.kind === 'draft'){
+      if (paid) set('verifier', 'draft_paid', ecart ? { e: it.payments[0].ecart } : {});
+      else if (debut && o.date && o.date < debut) set('info', 'before_start', { dt: debut });
+      else if (it.replacedBy) set('verifier', 'draft_dup', { o: it.replacedBy.name, dt: it.replacedBy.date });
+      else if (it.offTag) tagInfo();
+      else if (ubsStart && o.date && o.date < addDays(ubsStart, -30)) set('info', 'before_ubs');
+      else if (!o.sent) set('verifier', 'draft_not_sent', { d: r.age });
+      else if (r.age !== null && r.age < delai) set('attente', 'draft_in_delay', { d: r.age });
+      else set('relancer', 'draft_unpaid', { d: r.age });
+    }
+    else if (it.offTag && !paid) set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
     else if (!paid && debut && o.date && o.date < debut) set('info', 'before_start', { dt: debut });
     else if (paid && it.kind === 'pending') set('verifier', 'pending_but_paid');
     else if (paid && ecart && it.payments.some(p => Math.abs(p.ecart) > Math.max(1, it.amount * 0.02))) set('verifier', 'paid_ecart', { e: it.payments[0].ecart });
@@ -1143,6 +1215,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
     else set('relancer', it.kind === 'pending' ? 'pending_unpaid' : 'manual_unpaid', { d: r.age });
     if (it.kind === 'manual' && o.status && /pending|partially/.test(o.status)) r.flags.push({ k: 'f_partial' });
     if (it.offTag && paid) r.flags.push({ k: 'f_tag_ignored', p: { t: it.offTag } });
+    if (it.kind === 'draft' && o.billing && o.billing !== o.customer && deaccent(o.billing.toLowerCase()).trim() !== deaccent(o.customer.toLowerCase()).trim()) r.flags.push({ k: 'f_billing', p: { n: o.billing.trim() } });
     return r;
   }).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
@@ -1182,7 +1255,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   const free = credits.filter(c => !c.usedBy.length);
   const unidentified = free.filter(c => !knownClient(c.counterparty)).map(c => ({ date: c.date, montant: c.amount, de: c.counterparty, libelle: c.desc }));
   const sansCommande = free.filter(c => knownClient(c.counterparty)).map(c => ({ date: c.date, montant: c.amount, de: c.counterparty, client: knownClient(c.counterparty), libelle: c.desc }));
-  const counts = { commandes: orders.length, manuelles: items.length, ubs: txs.length };
+  const counts = { commandes: orders.length, manuelles: items.filter(i => i.kind !== 'draft').length, brouillons: drafts.length, ubs: txs.length };
   return { rows, payouts, unidentified, sansCommande, asOf, ubsStart, counts };
 }
 
@@ -1198,24 +1271,25 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       eyebrow: 'Caffè Suiso · interne', title: 'Contrôle des paiements', doc: 'Contrôle paiements',
       privacy: "Tes fichiers sont lus dans ce navigateur. Rien n'est envoyé ni enregistré en ligne.",
       c1_t: 'Relevés UBS', c1_h: 'PDF « Movimenti di conto », un ou plusieurs', c1_b: 'Choisir les PDF',
-      c2_t: 'Exports Shopify', c2_h: 'Rapport <b>Paiements</b> (obligatoire) + rapport <b>Commandes</b> (recommandé), en .csv', c2_b: 'Choisir les CSV',
-      howto_t: 'Comment créer les deux rapports dans Shopify (une seule fois)',
+      c2_t: 'Exports Shopify', c2_h: 'Rapport <b>Paiements</b> (obligatoire) + rapport <b>Commandes</b> et export <b>Brouillons</b> (recommandés), en .csv', c2_b: 'Choisir les CSV',
+      howto_t: 'Comment préparer les fichiers Shopify',
+      q3_t: 'Export 3 — Brouillons (recommandé : factures envoyées pas encore payées)', q3_h: 'Pas de requête : <b>Commandes → Brouillons → Exporter</b> → CSV. À refaire à chaque contrôle.',
       howto_intro: 'Dans Shopify : <b>Analytique → Rapports → Nouvelle exploration</b>. Remplace la requête par celle ci-dessous, puis <b>Enregistrer sous…</b> Ensuite, chaque mois : ouvre le rapport → <b>Exporter</b> → CSV.',
       q1_t: 'Rapport 1 — Paiements (obligatoire)', q2_t: 'Rapport 2 — Commandes (recommandé : dates exactes et commandes non payées)', copy: 'Copier', copiedq: 'Copié ✓',
       howto_tags: 'Commande manuelle <b>pas</b> payée par virement ? Ajoute un tag dans Shopify : <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… ou <code>paid</code> si tu as vérifié toi-même. Si un virement correspondant arrive quand même, il est relié à la commande et le tag est ignoré. La liste est modifiable dans Paramètres.',
       nofile: 'Aucun fichier', reading: 'Lecture…', run: 'Lancer le contrôle', settings: 'Paramètres',
       h_notready: 'Charge les relevés UBS et au moins le rapport Paiements de Shopify.', h_ready: 'Tout est prêt.', h_noorders: 'Prêt — ajoute aussi le rapport Commandes pour les dates exactes et les commandes non payées.',
       st_ubs: '✓ {n} relevé(s) · {m} mouvements', fromto: 'du {a} au {b}', bal_ok: 'soldes vérifiés', bal_ko: 'soldes à contrôler (relevé manquant ?)', clear: 'vider',
-      st_pay: '✓ Paiements : {n} commandes', st_ord: '✓ Commandes : {n}', st_nopay: 'rapport Paiements manquant', st_noord: 'rapport Commandes non chargé (facultatif)',
-      err_read: 'Impossible de lire ce fichier : {e}', err_kind: '« {f} » n’est ni le rapport Paiements ni le rapport Commandes',
+      st_pay: '✓ Paiements : {n} commandes', st_ord: '✓ Commandes : {n}', st_nopay: 'rapport Paiements manquant', st_noord: 'rapport Commandes non chargé (facultatif)', st_dr: '✓ Brouillons : {n} ouverts', st_nodr: 'export Brouillons non chargé (recommandé)',
+      err_read: 'Impossible de lire ce fichier : {e}', err_kind: '« {f} » n’est ni le rapport Paiements, ni le rapport Commandes, ni l’export Brouillons',
       asof: 'Situation au <b>{d}</b> (dernier mouvement UBS) · relevés du {a} au {b}', chain_ko: 'soldes non continus : un relevé manque peut-être',
       k_rel: 'à relancer', k_ver: 'à vérifier', k_ok: 'virements reçus', k_vers: 'alerte(s) versements', k_vers0: 'versements OK', k_non: 'virements non identifiés',
       t_rel: 'À relancer', t_ver: 'À vérifier', t_vers: 'Versements', t_non: 'Virements non identifiés', t_all: 'Commandes manuelles',
-      n_rel: 'Commandes payées « manuellement » dans Shopify (ou pas encore payées) pour lesquelles aucun virement n’a été trouvé sur UBS.',
-      n_ver: 'Virement trouvé mais avec un écart de montant, ou commande encore « en attente » dans Shopify alors que l’argent est arrivé.',
+      n_rel: 'Commandes payées « manuellement » dans Shopify (ou pas encore payées), et factures envoyées depuis un brouillon, pour lesquelles aucun virement n’a été trouvé sur UBS.',
+      n_ver: 'Virement trouvé mais avec un écart de montant, ou commande encore « en attente » dans Shopify alors que l’argent est arrivé. Aussi : brouillons payés à finaliser, brouillons en double et brouillons jamais envoyés.',
       n_vers: 'Ce que Shopify a encaissé via chaque prestataire, comparé à ce qui est arrivé sur UBS. Un écart de 1 à 3 % correspond aux frais.',
       n_non: 'Virements reçus qu’aucune commande n’explique. « Associer » crée un alias, « Ignorer » les retire du contrôle.',
-      n_all: 'Toutes les commandes à paiement manuel ou non payées, avec leur statut.',
+      n_all: 'Toutes les commandes à paiement manuel ou non payées, et les brouillons ouverts, avec leur statut.',
       nonid_unknown: 'Émetteur inconnu', nonid_unknown_d: 'Aucun client Shopify ne correspond à ce nom.',
       nonid_known: 'Clients connus, sans commande correspondante', nonid_known_d: 'Le client existe dans Shopify, mais aucune commande manuelle de ce montant n’a été trouvée (paiement groupé, commande payée autrement, ou commande d’avant l’export).',
       filter: 'Filtrer (client, n° de commande, montant…)', copySel: 'Copier la sélection pour les relances', copied: 'Copié ({n})',
@@ -1227,7 +1301,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       unknown: 'inconnue', see: 'voir', yes: 'oui', never: 'jamais',
       link: 'Associer à un client', ignore: 'Ignorer', link_ph: 'Client Shopify', ok: 'OK',
       s_relancer: 'À relancer', s_verifier: 'À vérifier', s_ok: 'Virement reçu', s_info: 'Hors contrôle', s_attente: 'Dans le délai', s_nonid: 'Non identifié',
-      gw_manual: 'Manuel', gw_pending: 'Non payée', pay_group: ' (virement groupé ×{n})', pay_diff: ' · écart {d}',
+      gw_manual: 'Manuel', gw_pending: 'Non payée', gw_draft: 'Brouillon', gw_draft_sent: 'Brouillon · facture envoyée', pay_group: ' (virement groupé ×{n})', pay_diff: ' · écart {d}',
       fam_cartes: 'Cartes (Stripe / Shopify Payments)', fam_twint: 'TWINT', fam_paypal: 'PayPal', fam_autre: 'Autre prestataire',
       copy_prompt: 'Copie ce texte :',
       s_intro: 'Enregistrés dans ce navigateur. Exporte-les pour les garder ou les utiliser sur un autre ordinateur.',
@@ -1244,7 +1318,11 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
         off_tag: 'Aucun virement, pas de relance (tag « {t} »)', paid_tag: 'Marquée payée à la main (tag « {t} »)', before_start: 'Avant le début du contrôle ({dt})',
         before_ubs: 'Antérieure aux relevés UBS chargés', in_delay: 'Dans le délai ({d} j)', pending_in_delay: 'Non payée, dans le délai ({d} j)',
         manual_unpaid: 'Aucun virement trouvé depuis {d} jours', pending_unpaid: 'Commande non payée depuis {d} jours',
-        f_partial: 'partiellement payée dans Shopify', f_tag_ignored: 'virement trouvé : tag « {t} » ignoré',
+        draft_paid: 'Virement reçu, mais le brouillon est encore ouvert — à finaliser dans Shopify (« Marquer comme payé »)',
+        draft_dup: 'Probablement en double avec la commande {o} du {dt} — brouillon à supprimer',
+        draft_not_sent: 'Brouillon jamais envoyé depuis Shopify, aucun paiement ({d} j) — à envoyer ou supprimer',
+        draft_in_delay: 'Facture envoyée, dans le délai ({d} j)', draft_unpaid: 'Facture envoyée, aucun paiement depuis {d} jours',
+        f_partial: 'partiellement payée dans Shopify', f_billing: 'facturé au nom de « {n} »', f_tag_ignored: 'virement trouvé : tag « {t} » ignoré',
         no_payout: 'Aucun versement sur UBS depuis le {since} — {a} CHF de ventes en attente', no_payout_never: 'Aucun versement reçu sur UBS — {a} CHF de ventes en attente',
         low_ratio: 'Seulement {r} % des ventes reçues sur UBS', more_received: 'UBS a reçu {a} CHF de plus (ventes encaissées hors Shopify ?)',
         pp_balance: 'L’argent reste sur PayPal jusqu’au retrait — solde estimé {a} CHF', payout_ok: 'Versements réguliers',
@@ -1254,24 +1332,25 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       eyebrow: 'Caffè Suiso · interno', title: 'Controllo pagamenti', doc: 'Controllo pagamenti',
       privacy: 'I file vengono letti in questo browser. Nulla viene inviato o salvato online.',
       c1_t: 'Estratti UBS', c1_h: 'PDF «Movimenti di conto», uno o più', c1_b: 'Scegli i PDF',
-      c2_t: 'Export Shopify', c2_h: 'Report <b>Pagamenti</b> (obbligatorio) + report <b>Ordini</b> (consigliato), in .csv', c2_b: 'Scegli i CSV',
-      howto_t: 'Come creare i due report in Shopify (una sola volta)',
+      c2_t: 'Export Shopify', c2_h: 'Report <b>Pagamenti</b> (obbligatorio) + report <b>Ordini</b> ed export <b>Bozze</b> (consigliati), in .csv', c2_b: 'Scegli i CSV',
+      howto_t: 'Come preparare i file Shopify',
+      q3_t: 'Export 3 — Bozze (consigliato: fatture inviate non ancora pagate)', q3_h: 'Nessuna query: <b>Ordini → Bozze → Esporta</b> → CSV. Da rifare a ogni controllo.',
       howto_intro: 'In Shopify: <b>Analisi → Report → Nuova esplorazione</b>. Sostituisci la query con quella qui sotto, poi <b>Salva con nome…</b> Poi, ogni mese: apri il report → <b>Esporta</b> → CSV.',
       q1_t: 'Report 1 — Pagamenti (obbligatorio)', q2_t: 'Report 2 — Ordini (consigliato: date esatte e ordini non pagati)', copy: 'Copia', copiedq: 'Copiato ✓',
       howto_tags: 'Ordine manuale <b>non</b> pagato con bonifico? Aggiungi un tag in Shopify: <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… oppure <code>paid</code> se l’hai verificato tu. Se arriva comunque un bonifico corrispondente, viene collegato all’ordine e il tag è ignorato. L’elenco si modifica nelle Impostazioni.',
       nofile: 'Nessun file', reading: 'Lettura…', run: 'Avvia il controllo', settings: 'Impostazioni',
       h_notready: 'Carica gli estratti UBS e almeno il report Pagamenti di Shopify.', h_ready: 'Tutto pronto.', h_noorders: 'Pronto — aggiungi anche il report Ordini per date esatte e ordini non pagati.',
       st_ubs: '✓ {n} estratto/i · {m} movimenti', fromto: 'dal {a} al {b}', bal_ok: 'saldi verificati', bal_ko: 'saldi da controllare (manca un estratto?)', clear: 'svuota',
-      st_pay: '✓ Pagamenti: {n} ordini', st_ord: '✓ Ordini: {n}', st_nopay: 'report Pagamenti mancante', st_noord: 'report Ordini non caricato (facoltativo)',
-      err_read: 'Impossibile leggere il file: {e}', err_kind: '«{f}» non è né il report Pagamenti né il report Ordini',
+      st_pay: '✓ Pagamenti: {n} ordini', st_ord: '✓ Ordini: {n}', st_nopay: 'report Pagamenti mancante', st_noord: 'report Ordini non caricato (facoltativo)', st_dr: '✓ Bozze: {n} aperte', st_nodr: 'export Bozze non caricato (consigliato)',
+      err_read: 'Impossibile leggere il file: {e}', err_kind: '«{f}» non è né il report Pagamenti, né il report Ordini, né l’export Bozze',
       asof: 'Situazione al <b>{d}</b> (ultimo movimento UBS) · estratti dal {a} al {b}', chain_ko: 'saldi non continui: forse manca un estratto',
       k_rel: 'da sollecitare', k_ver: 'da verificare', k_ok: 'bonifici ricevuti', k_vers: 'avviso/i versamenti', k_vers0: 'versamenti OK', k_non: 'bonifici non identificati',
       t_rel: 'Da sollecitare', t_ver: 'Da verificare', t_vers: 'Versamenti', t_non: 'Bonifici non identificati', t_all: 'Ordini manuali',
-      n_rel: 'Ordini pagati «manualmente» in Shopify (o non ancora pagati) per cui non è stato trovato nessun bonifico su UBS.',
-      n_ver: 'Bonifico trovato ma con una differenza d’importo, oppure ordine ancora «in attesa» su Shopify anche se i soldi sono arrivati.',
+      n_rel: 'Ordini pagati «manualmente» in Shopify (o non ancora pagati) e fatture inviate da una bozza, per cui non è stato trovato nessun bonifico su UBS.',
+      n_ver: 'Bonifico trovato ma con una differenza d’importo, oppure ordine ancora «in attesa» su Shopify anche se i soldi sono arrivati. Anche: bozze pagate da finalizzare, bozze doppie e bozze mai inviate.',
       n_vers: 'Quanto Shopify ha incassato tramite ogni fornitore, confrontato con quanto è arrivato su UBS. Una differenza dell’1-3 % corrisponde alle commissioni.',
       n_non: 'Bonifici ricevuti che nessun ordine spiega. «Associa» crea un alias, «Ignora» li esclude dal controllo.',
-      n_all: 'Tutti gli ordini con pagamento manuale o non pagati, con il loro stato.',
+      n_all: 'Tutti gli ordini con pagamento manuale o non pagati, e le bozze aperte, con il loro stato.',
       nonid_unknown: 'Ordinante sconosciuto', nonid_unknown_d: 'Nessun cliente Shopify corrisponde a questo nome.',
       nonid_known: 'Clienti noti, senza ordine corrispondente', nonid_known_d: 'Il cliente esiste in Shopify, ma non è stato trovato nessun ordine manuale di questo importo (pagamento cumulativo, ordine pagato in altro modo o precedente all’export).',
       filter: 'Filtra (cliente, n° ordine, importo…)', copySel: 'Copia la selezione per i solleciti', copied: 'Copiato ({n})',
@@ -1283,7 +1362,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       unknown: 'sconosciuta', see: 'vedi', yes: 'sì', never: 'mai',
       link: 'Associa a un cliente', ignore: 'Ignora', link_ph: 'Cliente Shopify', ok: 'OK',
       s_relancer: 'Da sollecitare', s_verifier: 'Da verificare', s_ok: 'Bonifico ricevuto', s_info: 'Fuori controllo', s_attente: 'Nei termini', s_nonid: 'Non identificato',
-      gw_manual: 'Manuale', gw_pending: 'Non pagato', pay_group: ' (bonifico cumulativo ×{n})', pay_diff: ' · differenza {d}',
+      gw_manual: 'Manuale', gw_pending: 'Non pagato', gw_draft: 'Bozza', gw_draft_sent: 'Bozza · fattura inviata', pay_group: ' (bonifico cumulativo ×{n})', pay_diff: ' · differenza {d}',
       fam_cartes: 'Carte (Stripe / Shopify Payments)', fam_twint: 'TWINT', fam_paypal: 'PayPal', fam_autre: 'Altro fornitore',
       copy_prompt: 'Copia questo testo:',
       s_intro: 'Salvate in questo browser. Esportale per conservarle o usarle su un altro computer.',
@@ -1300,7 +1379,11 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
         off_tag: 'Nessun bonifico, nessun sollecito (tag «{t}»)', paid_tag: 'Segnato pagato a mano (tag «{t}»)', before_start: 'Prima dell’inizio del controllo ({dt})',
         before_ubs: 'Precedente agli estratti UBS caricati', in_delay: 'Nei termini ({d} giorni)', pending_in_delay: 'Non pagato, nei termini ({d} giorni)',
         manual_unpaid: 'Nessun bonifico trovato da {d} giorni', pending_unpaid: 'Ordine non pagato da {d} giorni',
-        f_partial: 'pagato parzialmente su Shopify', f_tag_ignored: 'bonifico trovato: tag «{t}» ignorato',
+        draft_paid: 'Bonifico ricevuto, ma la bozza è ancora aperta — da finalizzare su Shopify («Segna come pagato»)',
+        draft_dup: 'Probabilmente doppia rispetto all’ordine {o} del {dt} — bozza da eliminare',
+        draft_not_sent: 'Bozza mai inviata da Shopify, nessun pagamento ({d} giorni) — da inviare o eliminare',
+        draft_in_delay: 'Fattura inviata, nei termini ({d} giorni)', draft_unpaid: 'Fattura inviata, nessun pagamento da {d} giorni',
+        f_partial: 'pagato parzialmente su Shopify', f_billing: 'fatturato a nome di «{n}»', f_tag_ignored: 'bonifico trovato: tag «{t}» ignorato',
         no_payout: 'Nessun versamento su UBS dal {since} — {a} CHF di vendite in attesa', no_payout_never: 'Nessun versamento ricevuto su UBS — {a} CHF di vendite in attesa',
         low_ratio: 'Solo il {r} % delle vendite è arrivato su UBS', more_received: 'UBS ha ricevuto {a} CHF in più (vendite incassate fuori da Shopify?)',
         pp_balance: 'I soldi restano su PayPal fino al prelievo — saldo stimato {a} CHF', payout_ok: 'Versamenti regolari',
@@ -1310,24 +1393,25 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       eyebrow: 'Caffè Suiso · internal', title: 'Payment check', doc: 'Payment check',
       privacy: 'Your files are read in this browser. Nothing is sent or stored online.',
       c1_t: 'UBS statements', c1_h: 'PDF "Movimenti di conto", one or more', c1_b: 'Choose PDFs',
-      c2_t: 'Shopify exports', c2_h: '<b>Payments</b> report (required) + <b>Orders</b> report (recommended), as .csv', c2_b: 'Choose CSVs',
-      howto_t: 'How to create the two reports in Shopify (one time only)',
+      c2_t: 'Shopify exports', c2_h: '<b>Payments</b> report (required) + <b>Orders</b> report and <b>Drafts</b> export (recommended), as .csv', c2_b: 'Choose CSVs',
+      howto_t: 'How to prepare the Shopify files',
+      q3_t: 'Export 3 — Drafts (recommended: invoices sent but not paid yet)', q3_h: 'No query: <b>Orders → Drafts → Export</b> → CSV. Redo it at every check.',
       howto_intro: 'In Shopify: <b>Analytics → Reports → New exploration</b>. Replace the query with the one below, then <b>Save as…</b> Then, every month: open the report → <b>Export</b> → CSV.',
       q1_t: 'Report 1 — Payments (required)', q2_t: 'Report 2 — Orders (recommended: exact dates and unpaid orders)', copy: 'Copy', copiedq: 'Copied ✓',
       howto_tags: 'Manual order <b>not</b> paid by bank transfer? Add a tag in Shopify: <code>cash</code>, <code>twint</code>, <code>family</code>, <code>france</code>… or <code>paid</code> if you checked it yourself. If a matching transfer arrives anyway, it is linked to the order and the tag is ignored. The list can be edited in Settings.',
       nofile: 'No file', reading: 'Reading…', run: 'Run the check', settings: 'Settings',
       h_notready: 'Load the UBS statements and at least the Shopify Payments report.', h_ready: 'All set.', h_noorders: 'Ready — also add the Orders report for exact dates and unpaid orders.',
       st_ubs: '✓ {n} statement(s) · {m} transactions', fromto: 'from {a} to {b}', bal_ok: 'balances verified', bal_ko: 'balances to check (missing statement?)', clear: 'clear',
-      st_pay: '✓ Payments: {n} orders', st_ord: '✓ Orders: {n}', st_nopay: 'Payments report missing', st_noord: 'Orders report not loaded (optional)',
-      err_read: "Couldn't read this file: {e}", err_kind: '"{f}" is neither the Payments nor the Orders report',
+      st_pay: '✓ Payments: {n} orders', st_ord: '✓ Orders: {n}', st_nopay: 'Payments report missing', st_noord: 'Orders report not loaded (optional)', st_dr: '✓ Drafts: {n} open', st_nodr: 'Drafts export not loaded (recommended)',
+      err_read: "Couldn't read this file: {e}", err_kind: '"{f}" is not the Payments report, the Orders report or the Drafts export',
       asof: 'Status as of <b>{d}</b> (last UBS transaction) · statements from {a} to {b}', chain_ko: 'balances not continuous: a statement may be missing',
       k_rel: 'to chase', k_ver: 'to check', k_ok: 'transfers received', k_vers: 'payout alert(s)', k_vers0: 'payouts OK', k_non: 'unidentified transfers',
       t_rel: 'To chase', t_ver: 'To check', t_vers: 'Payouts', t_non: 'Unidentified transfers', t_all: 'Manual orders',
-      n_rel: 'Orders paid "manually" in Shopify (or not paid yet) for which no transfer was found on UBS.',
-      n_ver: 'Transfer found but with an amount difference, or order still "pending" in Shopify although the money has arrived.',
+      n_rel: 'Orders paid "manually" in Shopify (or not paid yet), and invoices sent from a draft, for which no transfer was found on UBS.',
+      n_ver: 'Transfer found but with an amount difference, or order still "pending" in Shopify although the money has arrived. Also: paid drafts to complete, duplicate drafts and drafts never sent.',
       n_vers: 'What Shopify collected through each provider, compared with what arrived on UBS. A 1–3% gap is the fees.',
       n_non: 'Transfers received that no order explains. "Link" creates an alias, "Ignore" removes them from the check.',
-      n_all: 'All orders with manual payment or still unpaid, with their status.',
+      n_all: 'All orders with manual payment or still unpaid, and open drafts, with their status.',
       nonid_unknown: 'Unknown sender', nonid_unknown_d: 'No Shopify client matches this name.',
       nonid_known: 'Known clients, no matching order', nonid_known_d: 'The client exists in Shopify, but no manual order of this amount was found (combined payment, order paid another way, or order older than the export).',
       filter: 'Filter (client, order no., amount…)', copySel: 'Copy selection for reminders', copied: 'Copied ({n})',
@@ -1339,7 +1423,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       unknown: 'unknown', see: 'see', yes: 'yes', never: 'never',
       link: 'Link to a client', ignore: 'Ignore', link_ph: 'Shopify client', ok: 'OK',
       s_relancer: 'To chase', s_verifier: 'To check', s_ok: 'Transfer received', s_info: 'Not checked', s_attente: 'Within terms', s_nonid: 'Unidentified',
-      gw_manual: 'Manual', gw_pending: 'Unpaid', pay_group: ' (combined transfer ×{n})', pay_diff: ' · difference {d}',
+      gw_manual: 'Manual', gw_pending: 'Unpaid', gw_draft: 'Draft', gw_draft_sent: 'Draft · invoice sent', pay_group: ' (combined transfer ×{n})', pay_diff: ' · difference {d}',
       fam_cartes: 'Cards (Stripe / Shopify Payments)', fam_twint: 'TWINT', fam_paypal: 'PayPal', fam_autre: 'Other provider',
       copy_prompt: 'Copy this text:',
       s_intro: 'Saved in this browser. Export them to keep them or use them on another computer.',
@@ -1356,7 +1440,11 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
         off_tag: 'No transfer, no reminder (tag "{t}")', paid_tag: 'Marked paid by hand (tag "{t}")', before_start: 'Before the start of the check ({dt})',
         before_ubs: 'Older than the UBS statements loaded', in_delay: 'Within terms ({d} days)', pending_in_delay: 'Unpaid, within terms ({d} days)',
         manual_unpaid: 'No transfer found for {d} days', pending_unpaid: 'Order unpaid for {d} days',
-        f_partial: 'partially paid in Shopify', f_tag_ignored: 'transfer found: tag "{t}" ignored',
+        draft_paid: 'Transfer received, but the draft is still open — complete it in Shopify ("Mark as paid")',
+        draft_dup: 'Probably a duplicate of order {o} from {dt} — delete the draft',
+        draft_not_sent: 'Draft never sent from Shopify, no payment ({d} days) — send or delete it',
+        draft_in_delay: 'Invoice sent, within terms ({d} days)', draft_unpaid: 'Invoice sent, no payment for {d} days',
+        f_partial: 'partially paid in Shopify', f_billing: 'billed to "{n}"', f_tag_ignored: 'transfer found: tag "{t}" ignored',
         no_payout: 'No payout on UBS since {since} — {a} CHF of sales pending', no_payout_never: 'No payout received on UBS — {a} CHF of sales pending',
         low_ratio: 'Only {r}% of sales received on UBS', more_received: 'UBS received {a} CHF more (sales collected outside Shopify?)',
         pp_balance: 'Money stays on PayPal until withdrawn — estimated balance {a} CHF', payout_ok: 'Regular payouts',
@@ -1402,7 +1490,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   function saveConfig(){ try { localStorage.setItem(CFG_KEY, JSON.stringify(config)); } catch (e) {} }
 
   // ---------- état ----------
-  const state = { ubs: [], pay: null, ord: null, result: null, tab: 'relancer', selected: new Set(), status: { ubs: null, shopify: null } };
+  const state = { ubs: [], pay: null, ord: null, drafts: null, result: null, tab: 'relancer', selected: new Set(), status: { ubs: null, shopify: null } };
 
   // ---------- lecture ----------
   async function readUbs(file){
@@ -1447,12 +1535,13 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       $('#clearUbs').onclick = () => { state.ubs = []; state.status.ubs = null; $('.drop[data-kind=ubs]').classList.remove('loaded'); renderStatuses(); updateRun(); };
     }
     const ss = $('[data-status=shopify]'), s2 = state.status.shopify;
-    if (!s2 && !state.pay && !state.ord){ ss.textContent = t('nofile'); return; }
+    if (!s2 && !state.pay && !state.ord && !state.drafts){ ss.textContent = t('nofile'); return; }
     if (s2 && s2.loading){ ss.textContent = t('reading'); return; }
     const lines = [];
     const cnt = (rows) => new Set(rows.map(r => r.name)).size;
     lines.push(state.pay ? `<span class="okline">${esc(t('st_pay', { n: cnt(state.pay.rows) }))}</span>` : `<span class="warn">${esc(t('st_nopay'))}</span>`);
     lines.push(state.ord ? `<span class="okline">${esc(t('st_ord', { n: cnt(state.ord.rows) }))}</span>` : `<span class="muted">${esc(t('st_noord'))}</span>`);
+    lines.push(state.drafts ? `<span class="okline">${esc(t('st_dr', { n: state.drafts.rows.filter(d => !d.completed).length }))}</span>` : `<span class="muted">${esc(t('st_nodr'))}</span>`);
     if (s2 && s2.errors) for (const e of s2.errors) lines.push(`<span class="err">${esc(e.kind ? t('err_kind', { f: e.f }) : t('err_read', { e: e.e }))}</span>`);
     ss.innerHTML = lines.join('<br>');
   }
@@ -1470,7 +1559,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       for (const f of files){
         try {
           const r = readShopifyCsv(csvToObjects(await f.text()));
-          if (r.kind === 'paiements') state.pay = r; else if (r.kind === 'commandes') state.ord = r; else errors.push({ kind: true, f: f.name });
+          if (r.kind === 'paiements') state.pay = r; else if (r.kind === 'commandes') state.ord = r; else if (r.kind === 'brouillons') state.drafts = r; else errors.push({ kind: true, f: f.name });
         } catch (e){ console.error(e); errors.push({ e: e.message === 'order_name' ? t('err_kind', { f: f.name }) : (e.message || String(e)) }); }
       }
       state.status.shopify = { errors };
@@ -1494,9 +1583,9 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   // ---------- contrôle ----------
   function run(){
     const m = mergeUbs();
-    state.result = reconcileV2({ payRows: state.pay.rows, orderRows: state.ord ? state.ord.rows : [], ubs: m, config });
+    state.result = reconcileV2({ payRows: state.pay.rows, orderRows: state.ord ? state.ord.rows : [], draftRows: state.drafts ? state.drafts.rows : [], ubs: m, config });
     state.result.ubsMeta = m;
-    const names = [...new Set([...state.pay.rows.map(r => r.customer), ...(state.ord ? state.ord.rows.map(r => r.customer) : []), ...m.transactions.filter(x => x.amount > 0).map(x => x.counterparty)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const names = [...new Set([...state.pay.rows.map(r => r.customer), ...(state.ord ? state.ord.rows.map(r => r.customer) : []), ...(state.drafts ? state.drafts.rows.map(r => r.customer) : []), ...m.transactions.filter(x => x.amount > 0).map(x => x.counterparty)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
     $('#knownNames').innerHTML = names.map(n => `<option value="${esc(n)}">`).join('');
     state.selected.clear(); $('#results').hidden = false; render();
   }
@@ -1539,7 +1628,8 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   const pill = (st) => `<span class="pill ${st === 'ok' ? 'fermer' : st}">${esc(statusLabel(st))}</span>`;
   const why = (r) => tr(r.rk, r.rp);
   const payText = (r) => (r.pays || []).map(p => `${fmtDate(p.date)} · ${p.from}${p.groupe ? t('pay_group', { n: p.groupe }) : ''}${p.ecart ? t('pay_diff', { d: (p.ecart > 0 ? '+' : '') + chf(p.ecart) }) : ''}`).join(' + ');
-  const gwText = (r) => r.kind === 'pending' ? t('gw_pending') : (r.gateways || []).map(g => /^manual$/i.test(g) ? t('gw_manual') : g).join(', ');
+  const gwText = (r) => r.kind === 'draft' ? t(r.shopStatus === 'draft_sent' ? 'gw_draft_sent' : 'gw_draft') : r.kind === 'pending' ? t('gw_pending') : (r.gateways || []).map(g => /^manual$/i.test(g) ? t('gw_manual') : g).join(', ');
+  const shopText = (r) => r.kind === 'draft' ? gwText(r) : r.shopStatus;
   const flagsHtml = (r) => (r.flags || []).map(f => `<span class="flag">⚑ ${esc(tr(f.k, f.p))}</span>`).join('<br>');
   const tagsHtml = (r) => (r.tags || []).length ? `<span class="sub">#${(r.tags || []).map(esc).join(' #')}</span>` : '';
   const dateCell = (r) => r.date ? fmtDate(r.date) : `<span class="sub">${esc(t('unknown'))}</span>`;
@@ -1560,7 +1650,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
       { h: t('col_order'), c: 'nowrap', w: r => esc(r.ref), t: r => r.ref }, { h: t('col_client'), w: r => esc(r.client || '—') + flagsHtml(r), t: r => r.client },
       { h: t('col_amount'), c: 'num', w: r => chf(r.montant), t: r => r.montant }, { h: t('col_date'), c: 'nowrap', w: dateCell, t: r => fmtDate(r.date) },
       { h: t('col_why'), w: r => `<b>${esc(why(r))}</b>`, t: why }, { h: t('col_found'), w: r => subOr(payText(r)), t: payText },
-      { h: t('col_shopst'), w: r => esc(r.shopStatus), t: r => r.shopStatus },
+      { h: t('col_shopst'), w: r => esc(shopText(r)), t: shopText },
     ];
     if (id === 'versements') return [
       { h: t('col_proc'), w: p => `<b>${esc(famLabel(p.famille))}</b>`, t: p => famLabel(p.famille) },
@@ -1630,7 +1720,7 @@ function reconcileV2({ payRows, orderRows, ubs, config }){
   $('#exportAll').onclick = () => {
     const R = state.result;
     const hdr = [t('col_status'), t('col_order'), t('col_client'), t('col_email'), t('col_amount'), t('col_date'), t('col_days'), t('col_pay'), t('col_tags'), t('col_why'), t('col_found'), t('col_shopst')];
-    const rows = R.rows.map(r => [statusLabel(r.statut), r.ref, r.client, r.email, r.montant, fmtDate(r.date), r.age, gwText(r), (r.tags || []).join(', '), why(r), payText(r), r.shopStatus]);
+    const rows = R.rows.map(r => [statusLabel(r.statut), r.ref, r.client, r.email, r.montant, fmtDate(r.date), r.age, gwText(r), (r.tags || []).join(', '), why(r), payText(r), shopText(r)]);
     for (const u of R.unidentified) rows.push([t('s_nonid'), '', u.de, '', u.montant, fmtDate(u.date), '', '', '', u.libelle, '', '']);
     download(`controle-paiements-${R.asOf}.csv`, toCsv(hdr, rows), 'text/csv');
   };

@@ -1183,6 +1183,16 @@ function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
   } };
   matchPass(items.filter(it => !it.offTag && !it.replacedBy));
   matchPass(items.filter(it => it.offTag && !it.replacedBy));
+  // dernier passage : virement du même client avec un autre montant (remise, frais de port…), écart ≤ 25 % → « à vérifier », jamais « reçu » d'office
+  const approxPass = (open) => { for (const c of credits){
+    if (c.usedBy.length) continue;
+    const cands = open.filter(it => !it.payments.length && it.o.date && c.date >= addDays(it.o.orderDate || it.o.date, -10) && daysBetween(it.o.date, c.date) <= 240
+        && Math.abs(c.amount - it.amount) <= Math.max(1, it.amount * 0.25) && idx.score(it.o.match || it.o.customer, c.counterparty) >= STRONG)
+      .sort((a, b) => a.o.date.localeCompare(b.o.date) || Math.abs(a.amount - c.amount) - Math.abs(b.amount - c.amount));
+    if (cands.length){ const it = cands[0]; it.payments.push({ date: c.date, from: c.counterparty, amount: c.amount, groupe: 0, ecart: round2(c.amount - it.amount), approx: true }); c.usedBy.push(it.o.name); }
+  } };
+  approxPass(items.filter(it => !it.offTag && !it.replacedBy));
+  approxPass(items.filter(it => it.offTag && !it.replacedBy));
 
   // ---------- statuts ----------
   const age = (d) => d && asOf ? daysBetween(d, asOf) : null;
@@ -1206,6 +1216,7 @@ function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
     }
     else if (it.offTag && !paid) set('info', /^(paye|payé|pagato|paid)$/i.test(it.offTag) ? 'paid_tag' : 'off_tag', { t: it.offTag });
     else if (!paid && debut && o.date && o.date < debut) set('info', 'before_start', { dt: debut });
+    else if (paid && it.payments.some(p => p.approx)) set('verifier', 'paid_other_amount', { e: it.payments[0].ecart });
     else if (paid && it.kind === 'pending') set('verifier', 'pending_but_paid');
     else if (paid && ecart && it.payments.some(p => Math.abs(p.ecart) > Math.max(1, it.amount * 0.02))) set('verifier', 'paid_ecart', { e: it.payments[0].ecart });
     else if (paid && ecart) set('ok', 'paid_round');
@@ -1313,6 +1324,7 @@ function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
       s_start: 'Début du contrôle', s_start_d: 'les commandes plus anciennes sont ignorées (laisser vide = tout)',
       s_import: 'Importer (.json)', s_export: 'Exporter (.json)', close: 'Fermer', del: 'Supprimer', s_bad: 'Fichier de paramètres illisible.',
       r: {
+        paid_other_amount: 'Virement de ce client avec un autre montant ({e}) — remise, frais de port ? À confirmer',
         paid_transfer: 'Virement reçu', paid_round: 'Virement reçu (petit écart d’arrondi)', paid_ecart: 'Virement reçu avec un écart de {e}',
         pending_but_paid: 'Virement reçu, mais commande encore « en attente » dans Shopify — à marquer payée',
         off_tag: 'Aucun virement, pas de relance (tag « {t} »)', paid_tag: 'Marquée payée à la main (tag « {t} »)', before_start: 'Avant le début du contrôle ({dt})',
@@ -1374,6 +1386,7 @@ function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
       s_start: 'Inizio del controllo', s_start_d: 'gli ordini più vecchi vengono ignorati (vuoto = tutti)',
       s_import: 'Importa (.json)', s_export: 'Esporta (.json)', close: 'Chiudi', del: 'Elimina', s_bad: 'File di impostazioni illeggibile.',
       r: {
+        paid_other_amount: 'Bonifico di questo cliente con un altro importo ({e}) — sconto, spese di spedizione? Da confermare',
         paid_transfer: 'Bonifico ricevuto', paid_round: 'Bonifico ricevuto (piccola differenza di arrotondamento)', paid_ecart: 'Bonifico ricevuto con una differenza di {e}',
         pending_but_paid: 'Bonifico ricevuto, ma ordine ancora «in attesa» su Shopify — da segnare come pagato',
         off_tag: 'Nessun bonifico, nessun sollecito (tag «{t}»)', paid_tag: 'Segnato pagato a mano (tag «{t}»)', before_start: 'Prima dell’inizio del controllo ({dt})',
@@ -1435,6 +1448,7 @@ function reconcileV2({ payRows, orderRows, draftRows, ubs, config }){
       s_start: 'Start of the check', s_start_d: 'older orders are ignored (empty = all)',
       s_import: 'Import (.json)', s_export: 'Export (.json)', close: 'Close', del: 'Delete', s_bad: 'Unreadable settings file.',
       r: {
+        paid_other_amount: 'Transfer from this client with a different amount ({e}) — discount, shipping? To confirm',
         paid_transfer: 'Transfer received', paid_round: 'Transfer received (small rounding difference)', paid_ecart: 'Transfer received with a difference of {e}',
         pending_but_paid: 'Transfer received, but order still "pending" in Shopify — mark as paid',
         off_tag: 'No transfer, no reminder (tag "{t}")', paid_tag: 'Marked paid by hand (tag "{t}")', before_start: 'Before the start of the check ({dt})',
